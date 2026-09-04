@@ -1,0 +1,23 @@
+# --- Python 缓存 ---
+__pycache__/
+*.pyc
+
+# --- 编辑器 / 中间件 ---
+.idea/
+.vscode/
+
+# --- 大体积 / 运行时产物(绝不入库) ---
+*.pt
+*.pth
+*.onnx
+*.jsonl
+
+# --- 王者荣耀本体里有的大数据/第三方/采集 ---
+wzry/human_data/
+wzry/scrcpy-win64-v2.0/
+wzry/models/
+wzry/pic/
+wzry/release_packages/
+
+# --- 金铲铲日志 ---
+jinchanchan/logs/

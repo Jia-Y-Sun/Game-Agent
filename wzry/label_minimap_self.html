@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minimap Self Labeler</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      background: #181a1f;
+      color: #f2f4f8;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 14px;
+      background: #252a32;
+      border-bottom: 1px solid #3a414d;
+    }
+    .toolbar label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+    input[type="number"] {
+      width: 72px;
+      background: #111318;
+      color: #f2f4f8;
+      border: 1px solid #4a5260;
+      border-radius: 4px;
+      padding: 4px 6px;
+    }
+    input[type="file"] {
+      max-width: 330px;
+    }
+    button {
+      background: #3d7eff;
+      color: white;
+      border: 0;
+      border-radius: 4px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #4d5666;
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .main {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) 320px;
+      gap: 14px;
+      padding: 14px;
+    }
+    .stage {
+      min-height: 520px;
+      background: #111318;
+      border: 1px solid #2d333d;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+    }
+    canvas {
+      image-rendering: pixelated;
+      cursor: crosshair;
+      background: #000;
+    }
+    .panel {
+      background: #20242c;
+      border: 1px solid #343b47;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .panel code {
+      background: #111318;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+    .status {
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #d6dbe5;
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <input id="files" type="file" accept="image/*" multiple webkitdirectory>
+    <label>left <input id="roiLeft" type="number" min="0" max="1" step="0.001" value="0.045"></label>
+    <label>top <input id="roiTop" type="number" min="0" max="1" step="0.001" value="0"></label>
+    <label>right <input id="roiRight" type="number" min="0" max="1" step="0.001" value="0.205"></label>
+    <label>bottom <input id="roiBottom" type="number" min="0" max="1" step="0.001" value="0.31"></label>
+    <label>scale <input id="scale" type="number" min="1" max="8" step="0.5" value="4"></label>
+    <button id="saveBtn" disabled>保存当前点</button>
+    <button id="skipBtn" class="secondary" disabled>跳过</button>
+    <button id="downloadBtn" disabled>下载 JSONL</button>
+  </div>
+
+  <div class="main">
+    <div class="stage">
+      <canvas id="canvas" width="1" height="1"></canvas>
+    </div>
+    <div class="panel">
+      <div><b>操作</b></div>
+      <div>1. 选择截图文件夹。</div>
+      <div>2. 在放大的小地图里，左键点击绿色边缘圆圈中心。</div>
+      <div>3. 按 <code>Enter</code> 或点“保存当前点”。</div>
+      <div>4. 看不清就按 <code>S</code> 跳过。</div>
+      <div>5. 全部点完后点“下载 JSONL”。</div>
+      <hr>
+      <div class="status" id="status">等待选择图片文件夹。</div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById("files");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const statusEl = document.getElementById("status");
+    const saveBtn = document.getElementById("saveBtn");
+    const skipBtn = document.getElementById("skipBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const roiInputs = ["roiLeft", "roiTop", "roiRight", "roiBottom", "scale"].map(id => document.getElementById(id));
+
+    let files = [];
+    let index = 0;
+    let image = null;
+    let objectUrl = null;
+    let roi = null;
+    let click = null;
+    let labels = [];
+
+    function num(id) {
+      return Number(document.getElementById(id).value);
+    }
+
+    function getRoi(img) {
+      const left = Math.max(0, Math.min(img.width - 1, Math.floor(img.width * num("roiLeft"))));
+      const right = Math.max(left + 1, Math.min(img.width, Math.floor(img.width * num("roiRight"))));
+      const top = Math.max(0, Math.min(img.height - 1, Math.floor(img.height * num("roiTop"))));
+      const bottom = Math.max(top + 1, Math.min(img.height, Math.floor(img.height * num("roiBottom"))));
+      return { left, top, right, bottom, width: right - left, height: bottom - top };
+    }
+
+    function draw() {
+      const scale = Math.max(1, num("scale"));
+      if (!image || !roi) {
+        canvas.width = 1;
+        canvas.height = 1;
+        return;
+      }
+      canvas.width = Math.round(roi.width * scale);
+      canvas.height = Math.round(roi.height * scale);
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, roi.left, roi.top, roi.width, roi.height, 0, 0, canvas.width, canvas.height);
+      if (click) {
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(click.x - 14, click.y);
+        ctx.lineTo(click.x + 14, click.y);
+        ctx.moveTo(click.x, click.y - 14);
+        ctx.lineTo(click.x, click.y + 14);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(click.x, click.y, 9, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    function setStatus(extra = "") {
+      if (!files.length) {
+        statusEl.textContent = "等待选择图片文件夹。";
+        return;
+      }
+      const file = files[index];
+      const scale = Math.max(1, num("scale"));
+      let text = `图片 ${index + 1}/${files.length}\n${file.webkitRelativePath || file.name}\n已标注: ${labels.length}`;
+      if (click && roi) {
+        const roiX = click.x / scale;
+        const roiY = click.y / scale;
+        text += `\n当前点 ROI ratio: [${(roiX / roi.width).toFixed(4)}, ${(roiY / roi.height).toFixed(4)}]`;
+      }
+      if (extra) text += `\n${extra}`;
+      statusEl.textContent = text;
+    }
+
+    function loadCurrent() {
+      click = null;
+      saveBtn.disabled = true;
+      skipBtn.disabled = index >= files.length;
+      downloadBtn.disabled = labels.length === 0;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (index >= files.length) {
+        image = null;
+        roi = null;
+        draw();
+        setStatus("全部完成，可以下载 JSONL。");
+        return;
+      }
+      objectUrl = URL.createObjectURL(files[index]);
+      const img = new Image();
+      img.onload = () => {
+        image = img;
+        roi = getRoi(img);
+        draw();
+        setStatus();
+      };
+      img.src = objectUrl;
+    }
+
+    function saveCurrent() {
+      if (!image || !roi || !click) return;
+      const scale = Math.max(1, num("scale"));
+      const roiX = click.x / scale;
+      const roiY = click.y / scale;
+      const absX = roi.left + roiX;
+      const absY = roi.top + roiY;
+      const file = files[index];
+      labels.push({
+        image_path: file.webkitRelativePath || file.name,
+        image_width: image.width,
+        image_height: image.height,
+        minimap_roi: [roi.left, roi.top, roi.right, roi.bottom],
+        self_center_abs: [Number(absX.toFixed(2)), Number(absY.toFixed(2))],
+        self_center_roi_px: [Number(roiX.toFixed(2)), Number(roiY.toFixed(2))],
+        self_center_roi_ratio: [
+          Number((roiX / roi.width).toFixed(4)),
+          Number((roiY / roi.height).toFixed(4))
+        ]
+      });
+      index += 1;
+      loadCurrent();
+    }
+
+    function skipCurrent() {
+      if (index < files.length) {
+        index += 1;
+        loadCurrent();
+      }
+    }
+
+    function downloadJsonl() {
+      const text = labels.map(item => JSON.stringify(item)).join("\n") + "\n";
+      const blob = new Blob([text], { type: "application/jsonl" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "minimap_self_centers.jsonl";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    fileInput.addEventListener("change", () => {
+      files = Array.from(fileInput.files)
+        .filter(file => /^image\//.test(file.type))
+        .sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name));
+      index = 0;
+      labels = [];
+      loadCurrent();
+    });
+
+    canvas.addEventListener("click", event => {
+      if (!image || !roi) return;
+      const rect = canvas.getBoundingClientRect();
+      click = {
+        x: Math.max(0, Math.min(canvas.width, event.clientX - rect.left)),
+        y: Math.max(0, Math.min(canvas.height, event.clientY - rect.top))
+      };
+      saveBtn.disabled = false;
+      draw();
+      setStatus();
+    });
+
+    saveBtn.addEventListener("click", saveCurrent);
+    skipBtn.addEventListener("click", skipCurrent);
+    downloadBtn.addEventListener("click", downloadJsonl);
+    roiInputs.forEach(input => input.addEventListener("change", () => {
+      if (image) {
+        roi = getRoi(image);
+        click = null;
+        saveBtn.disabled = true;
+        draw();
+        setStatus("ROI 已更新。");
+      }
+    }));
+
+    window.addEventListener("keydown", event => {
+      if (event.key === "Enter") saveCurrent();
+      if (event.key.toLowerCase() === "s") skipCurrent();
+      if (event.key.toLowerCase() === "u") {
+        click = null;
+        saveBtn.disabled = true;
+        draw();
+        setStatus("已清除当前点。");
+      }
+    });
+  </script>
+</body>
+</html>
