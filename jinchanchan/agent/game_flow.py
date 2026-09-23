@@ -1,7 +1,8 @@
 import time
 import threading
 import pyautogui
-from config import ButtonImages, PAGE_LOAD_DELAY, MATCH_FOUND_DELAY, ScreenCoords
+from config import (ButtonImages, PAGE_LOAD_DELAY, MATCH_FOUND_DELAY, ScreenCoords,
+                    SDK_ENABLED, SDK_ADB_HOST, SDK_ADB_PORT)
 from agent.image_recognition import find_image, click_image as img_click, find_question_mark_superfast
 from agent.mouse_controller import click
 from agent.phase_detector import (
@@ -57,6 +58,7 @@ class GameFlow:
         self._bench_slots = None
         self._battle_slots = None
         self._current_round = None
+        self._sdk = None  # Sunflower SDK 桥接层, SDK_ENABLED 时初始化
 
     def _init_coords(self):
         if self._shop_slots is None:
@@ -121,10 +123,17 @@ class GameFlow:
     def _buy_heroes_rightmost_only(self, time_limit):
         end_t = time.time() + time_limit
         count = 0
-        pos = self._rightmost_shop
         print("  Buy heroes (rightmost only): click 1 per sec")
         while time.time() < end_t:
-            click(pos[0], pos[1], delay=0.2)
+            if self._sdk is not None:
+                # SDK 模式: 通过 ADB 点商店第 5 格(最贵英雄), 不受窗口位置影响
+                try:
+                    self._sdk.buy_chess(4)
+                except Exception as e:  # noqa: BLE001
+                    print("  SDK buy failed: %s" % e)
+            else:
+                pos = self._rightmost_shop
+                click(pos[0], pos[1], delay=0.2)
             count += 1
             time.sleep(0.8)
         print("  Buy heroes done, clicked %d times" % count)
@@ -186,6 +195,16 @@ class GameFlow:
         self._init_coords()
         print("")
         print("--- Prepare Phase Flow ---")
+
+        # SDK 模式: 读取细粒度对局信息(金币/等级/回合/商店英雄名)
+        if self._sdk is not None:
+            try:
+                info = self._sdk.get_basic_game_info()
+                if info:
+                    print("  [SDK] coin=%s level=%s period=%s" % (info.coin, info.level, info.period))
+                    print("  [SDK] store=%s" % info.store)
+            except Exception as e:  # noqa: BLE001
+                print("  [SDK] read basic info failed: %s" % e)
 
         # 尝试OCR识别准备阶段（5s超时）
         print("1) Try OCR: wait for prepare phase sign...")
@@ -266,6 +285,17 @@ class GameFlow:
 
             # Start ? detection daemon
             _start_q_watcher()
+
+            # SDK 模式: 连接雷电模拟器(独立线程事件循环, 不阻塞主流程)
+            if SDK_ENABLED:
+                try:
+                    from agent.sdk.bridge import SdkBridge
+                    print("Initializing Sunflower SDK (ADB %s:%d)..." % (SDK_ADB_HOST, SDK_ADB_PORT))
+                    self._sdk = SdkBridge(host=SDK_ADB_HOST, port=SDK_ADB_PORT, timeout=180)
+                    print("Sunflower SDK ready")
+                except Exception as e:
+                    print("SDK init failed, running without SDK: %s" % e)
+                    self._sdk = None
 
             round_count = 0
             while True:

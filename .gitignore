@@ -21,3 +21,10 @@ wzry/release_packages/
 
 # --- 金铲铲日志 ---
 jinchanchan/logs/
+
+# --- Sunflower 是独立克隆的参考项目, 不入本库 ---
+Sunflower/
+
+# --- jinchanchan 运行时产物 ---
+jinchanchan/logs/
+jinchanchan/images/screenshots/

@@ -4,3 +4,12 @@ Pillow==10.1.0
 pyautogui==0.9.54
 PyGetWindow==0.0.9
 keyboard==0.13.5
+# Sunflower SDK 移植(agent/sdk) 依赖
+easyocr==1.7.2
+adb-shell==0.4.4
+aiofiles>=23.0        # adb_shell 异步传输依赖
+async-timeout>=4.0    # adb_shell 异步传输依赖
+psutil>=5.9
+mss>=9.0
+# easyocr 依赖 torch, Windows 建议装 CPU 版以减小体积:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu

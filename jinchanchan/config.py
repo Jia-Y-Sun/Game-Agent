@@ -27,6 +27,13 @@ PAGE_LOAD_DELAY = 1.5
 MATCH_FOUND_DELAY = 0.5
 PREPARE_PHASE_DELAY = 1.0
 
+# ------ Sunflower SDK(细粒度识别: 棋子/商店/装备等, 移植自 Carey8175/Sunflower) ------
+# 通过 ADB 直连模拟器读取对局信息, 与 pyautogui 桌面坐标方案并存。
+SDK_ENABLED = False        # True 时对局主循环接入 SDK: 每轮打印商店/金币/等级并改用 ADB 买棋子
+SDK_ADB_HOST = "localhost"
+SDK_ADB_PORT = 5555        # 雷电模拟器默认 ADB 端口(多开为 5557/5559..., 失败会自动扫描)
+SDK_SCAN_IF_FAIL = True
+
 # ------ 图片资源路径 ------
 class ButtonImages:
     BASE = IMAGE_DIR
