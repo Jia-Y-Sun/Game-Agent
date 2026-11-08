@@ -25,7 +25,7 @@ QM_TEMPLATES = [
 ]
 
 QM_SCALES = [0.6, 0.8, 1.0, 1.25, 1.5, 1.75]
-QM_THRESHOLD = 0.62
+QM_THRESHOLD = 0.50
 
 
 class QuestionMarkDetector:

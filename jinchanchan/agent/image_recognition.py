@@ -102,7 +102,7 @@ def _match_single_template(screen_bgr, template_path, region_offset, confidence=
     return None
 
 
-def _scan_question_marks(regions=None, confidence=0.70, log_find=True):
+def _scan_question_marks(regions=None, confidence=0.58, log_find=True):
     """通用问号扫描：在指定区域中同时匹配两种?模板"
     返回 (x, y) 或 None
     注意：两种问号用不同置信度，第一种用高阈值避免误报
@@ -111,8 +111,8 @@ def _scan_question_marks(regions=None, confidence=0.70, log_find=True):
         regions = QUESTION_MARK_REGIONS
     # 定义两种问号及其各自的置信度
     templates = [
-        (ButtonImages.QUESTION_MARK, "question_mark_1", 0.65),
-        (ButtonImages.QUESTION_MARK_2, "question_mark_2", 0.55),
+        (ButtonImages.QUESTION_MARK, "question_mark_1", 0.52),
+        (ButtonImages.QUESTION_MARK_2, "question_mark_2", 0.45),
     ]
     for region in regions:
         try:
