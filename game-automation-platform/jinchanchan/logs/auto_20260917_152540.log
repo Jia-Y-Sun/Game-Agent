@@ -1,0 +1,10 @@
+[15:25:43] INFO - [SDK] 已连接设备 localhost:5555
+[15:25:43] INFO - [SDK] 截图分辨率 1920x1080, 坐标缩放 x1.875 / y1.500
+[15:25:47] INFO - [SDK] 正在初始化 easyocr 模型(首次运行需下载, 约 100MB)...
+[15:25:49] INFO - [SDK] easyocr 就绪
+[15:27:37] WARNING - [SDK] 金币 OCR 异常: 0%
+[15:28:13] WARNING - [SDK] 金币 OCR 异常: 0%
+[15:28:48] WARNING - [SDK] 金币 OCR 异常: 0%
+[15:29:03] WARNING - [SDK] 不在对局中, 无法读取棋子信息
+[15:29:33] WARNING - [SDK] 金币 OCR 异常: 0%
+[15:30:50] WARNING - [SDK] 金币 OCR 异常: 0%

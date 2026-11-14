@@ -12,26 +12,18 @@ __pycache__/
 *.onnx
 *.jsonl
 
-# --- 王者荣耀本体里有的大数据/第三方/采集 ---
-wzry/human_data/
-wzry/scrcpy-win64-v2.0/
-wzry/models/
-wzry/pic/
-wzry/release_packages/
-
-# --- 金铲铲日志 ---
-jinchanchan/logs/
-
-# --- Sunflower 是独立克隆的参考项目, 不入本库 ---
+# --- 参考克隆仓库(不入本库) ---
 Sunflower/
-
-# --- jinchanchan 运行时产物 ---
-jinchanchan/logs/
-jinchanchan/images/screenshots/
-
-# --- 平台集成 ---
 jcc-auto-probe/
-Sunflower/
-minipilot-main/.venv/
-minipilot-main/runs/
-minipilot-main/mini_pilot.config.json
+
+# --- 平台(game-automation-platform/) 运行时产物 ---
+game-automation-platform/jinchanchan/logs/
+game-automation-platform/jinchanchan/images/screenshots/
+game-automation-platform/wzry/human_data/
+game-automation-platform/wzry/scrcpy-win64-v2.0/
+game-automation-platform/wzry/models/
+game-automation-platform/wzry/pic/
+game-automation-platform/wzry/release_packages/
+game-automation-platform/minipilot-main/.venv/
+game-automation-platform/minipilot-main/runs/
+game-automation-platform/minipilot-main/mini_pilot.config.json

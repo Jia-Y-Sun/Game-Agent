@@ -1,0 +1,17 @@
+[17:35:50] INFO - [SDK] 已连接设备 localhost:5555
+[17:35:52] INFO - [SDK] 截图分辨率 1920x1080, 坐标缩放 x1.875 / y1.500
+[17:36:07] INFO - [SDK] 正在初始化 easyocr 模型(首次运行需下载, 约 100MB)...
+[17:36:13] INFO - [SDK] easyocr 就绪
+[17:39:28] WARNING - [SDK] 截图失败: Timeout: read 0 of 24 bytes (transport_timeout_s = 9, read_timeout_s = 10.0)
+[17:39:43] WARNING - [SDK] 截图失败: Timeout: read 0 of 24 bytes (transport_timeout_s = 9, read_timeout_s = 10.0)
+[17:39:53] WARNING - [SDK] 截图失败: Timeout: read 0 of 24 bytes (transport_timeout_s = 9, read_timeout_s = 10.0)
+[17:40:03] WARNING - [SDK] 截图失败: Timeout: read 0 of 24 bytes (transport_timeout_s = 9, read_timeout_s = 10.0)
+[17:40:07] WARNING - [SDK] 截图失败: [WinError 10053] 你的主机中的软件中止了一个已建立的连接。
+[17:40:07] WARNING - [SDK] 截图失败: [WinError 10053] 你的主机中的软件中止了一个已建立的连接。
+[17:40:07] WARNING - [SDK] 截图失败: [WinError 10053] 你的主机中的软件中止了一个已建立的连接。
+[17:40:11] WARNING - [SDK] 截图失败: [WinError 10053] 你的主机中的软件中止了一个已建立的连接。
+[17:40:11] WARNING - [SDK] 截图失败: [WinError 10053] 你的主机中的软件中止了一个已建立的连接。
+[17:40:11] WARNING - [SDK] 截图失败: [WinError 10053] 你的主机中的软件中止了一个已建立的连接。
+[17:40:15] WARNING - [SDK] 截图失败: [WinError 10053] 你的主机中的软件中止了一个已建立的连接。
+[17:40:15] WARNING - [SDK] 截图失败: [WinError 10053] 你的主机中的软件中止了一个已建立的连接。
+[17:40:15] WARNING - [SDK] 截图失败: [WinError 10053] 你的主机中的软件中止了一个已建立的连接。
