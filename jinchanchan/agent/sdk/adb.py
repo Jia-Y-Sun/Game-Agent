@@ -146,7 +146,7 @@ class AdbOCR:
                 logger.error(f"[SDK] 连接 {host}:{port} 失败")
 
         # 连接失败时扫描本地 adb 端口(雷电多开: 5555/5557/5559...)
-        if host == "localhost" and scan_if_fail:
+        if host in ("localhost", "127.0.0.1", "::1") and scan_if_fail:
             port_found = await asyncio.to_thread(self._scan_local_devices)
             if port_found:
                 try:
@@ -220,7 +220,13 @@ class AdbOCR:
         return 0, 0
 
     async def get_screen_density(self):
-        output = await self._device.shell("wm density")
+        if self._transport is not None:
+            ok, output = await asyncio.to_thread(self._transport.shell, "wm density")
+            if not ok:
+                return 0
+            output = output.decode("utf-8", "replace")
+        else:
+            output = await self._device.shell("wm density")
         matches = re.findall(r"(\d+)", output)
         return int(matches[-1]) if matches else 0
 

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "snapshot": "local-2026-11-09",
+  "distribution_status": "not_published",
+  "assets": [
+    {
+      "path": "models/start.onnx",
+      "bytes": 117891814,
+      "sha256": "431c345aeb5612b77af609ad809310549d67bbe17e4db75aed0e62d6e36bec1e",
+      "source": "Existing local deployment; upstream wzry_ai model, redistribution terms not verified."
+    },
+    {
+      "path": "models/death.onnx",
+      "bytes": 117891812,
+      "sha256": "ba9944b9dd2dc1a904ade748c5fb1449886738ccc68a8ef87b3fe3d03f618baa",
+      "source": "Existing local deployment; upstream wzry_ai model, redistribution terms not verified."
+    },
+    {
+      "path": "src/wzry_ai_bc.pt",
+      "bytes": 799162357,
+      "sha256": "0995511073bfc8ee32035cc7119cf1169b4b00fd4dc81b6077658ed00198d393",
+      "source": "Local behavior-cloning checkpoint; request the matching assets from the project maintainer."
+    }
+  ]
+}

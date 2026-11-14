@@ -58,6 +58,23 @@ def get_args():
     parser.add_argument('--real_iphone', type=bool, default=True, help="real_iphone")
     parser.add_argument('--window_title', type=str, default='wzry_ai', help="window_title")
     parser.add_argument('--device_id', type=str, default='cuda:0', help="device_id")
+    parser.add_argument('--mode', choices=('standalone', 'external'), default='standalone',
+                        help="Run directly or as an external capture-orchestrator driver")
+    parser.add_argument('--device-id', dest='external_device_id', type=str, default=None,
+                        help="ADB serial or endpoint used in external mode")
+    parser.add_argument('--event-file', type=str, default=None,
+                        help="JSONL lifecycle event file used in external mode")
+    parser.add_argument('--stop-file', type=str, default=None,
+                        help="Stop marker consumed by the external lifecycle")
+    parser.add_argument('--timeout', type=float, default=None,
+                        help="Global external-mode timeout in seconds")
+    parser.add_argument('--match-ready-timeout', type=float, default=180.0,
+                        help="Maximum seconds to wait for MATCH_READY in external mode")
+    parser.add_argument('--external_screenshot_source', type=str, default='adb',
+                        choices=['adb', 'window'],
+                        help="Screenshot backend used by the external game driver")
+    parser.add_argument('--run-id', type=str, default=None,
+                        help="Run identifier included in lifecycle events")
     parser.add_argument('--memory_size', type=int, default=10000, help="Replay memory size")
     parser.add_argument('--batch_size', type=int, default=64, help="Batch size for training")
     parser.add_argument('--learning_rate', type=float, default=0.001, help="Learning rate")
@@ -456,10 +473,18 @@ def get_args():
                         help="Interval for no-wave patrol moves when rookie patrol is enabled")
     parser.add_argument('--rookie_laner_hold_attack_interval_steps', type=int, default=3,
                         help="Interval for basic attacks while holding lane")
-    parser.add_argument('--finish_check_interval_steps', type=int, default=30,
+    parser.add_argument('--finish_check_interval_steps', type=int, default=10,
                         help="How often to run expensive OCR-based terminal checks")
-    parser.add_argument('--finish_check_start_step', type=int, default=120,
+    parser.add_argument('--finish_check_start_step', type=int, default=30,
                         help="Skip expensive OCR-based terminal checks before this episode step")
+    parser.add_argument('--match_exit_detect_enabled', type=str2bool, default=True,
+                        help="Treat a sustained loss of the in-match start signal as match end")
+    parser.add_argument('--match_exit_check_interval_steps', type=int, default=5,
+                        help="How often to check the in-match start signal after MATCH_READY")
+    parser.add_argument('--match_exit_confirm_steps', type=int, default=8,
+                        help="Consecutive missing start-signal checks required to end external mode")
+    parser.add_argument('--match_exit_min_step', type=int, default=30,
+                        help="Minimum episode step before start-signal absence can end the match")
     parser.add_argument('--death_check_interval_steps', type=int, default=5,
                         help="How often to run expensive death ONNX checks")
     parser.add_argument('--action_preview_enabled', type=str2bool, default=True,

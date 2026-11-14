@@ -1,0 +1,34 @@
+# Local configuration and secrets
+mini_pilot.config.json
+mini_pilot.config - 副本.json
+.env
+.env.*
+*.pem
+*.key
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE and OS metadata
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Runtime artifacts and local working data
+runs/
+backups/
+memories/
+.agents/
+
+# Capture outputs
+*.pcap
+*.pcapng
+*.mp4
+*.log

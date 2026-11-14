@@ -5,7 +5,7 @@
 #  - decision 1(B): 两套程序都假定跑在雷电模拟器、同屏可见。
 #    调度器截"同一片屏幕"判断当前画面属于哪款, 再把控制权交给对应主程序。
 #  - decision 2   : 串行执行, 任一时刻至多跑一个游戏子进程。
-#  - decision 3   : 调度只承担"调用/启停", 不 import、不修改两套现有代码。
+#  - decision 3   : 调度只承担"调用/启停", 不 import 游戏本体。
 #
 # 注意: 本文件禁止用文件内 docstring 标量语法书写, 统一用注释说明(便于被外层原样落盘)。
 import os
@@ -34,8 +34,8 @@ def _wzry_cmd():
     ]
 
 def _jcc_cmd():
-    # 金铲铲程序入口 main.py(无额外参数)
-    return ["python", "main.py"]
+    # 当前金铲铲自动对局入口; standalone 会负责匹配、对局和结算流程。
+    return ["python", "auto_loop.py", "--mode", "standalone"]
 
 GAMES = {
     "wzry":        {"dir": WZRY_DIR, "cmd": _wzry_cmd},

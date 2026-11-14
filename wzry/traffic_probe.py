@@ -150,7 +150,7 @@ def build_traffic_probe(android_controller):
 
     interfaces = [item.strip() for item in args.traffic_probe_interfaces.split(",") if item.strip()]
     return AdbProcNetDevTrafficProbe(
-        adb_path=f"{android_controller.scrcpy_dir}/adb",
+        adb_path=android_controller.adb_path,
         device_serial=android_controller.device_serial,
         interfaces=interfaces,
         timeout_sec=args.traffic_probe_timeout_sec,

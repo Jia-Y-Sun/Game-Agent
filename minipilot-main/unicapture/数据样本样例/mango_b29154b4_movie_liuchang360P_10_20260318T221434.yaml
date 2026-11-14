@@ -1,0 +1,68 @@
+version: 2.0.0
+time_zone: +0800
+name: mango_b29154b4_movie_liuchang360P_10_20260318T221434
+task_info:
+  start_time: 20260318T221355799+0800
+  end_time: 20260318T221618312+0800
+  action:
+  - time: 20260318T221355799+0800
+    description: '[stop_application] stop com.hunantv.imgo.activity.'
+  - time: 20260318T221409158+0800
+    description: '[click_poco] click UIObjectProxy of "text=清除数据" result success.'
+  - time: 20260318T221411642+0800
+    description: '[click_poco] click UIObjectProxy of "text=清除缓存" result success.'
+  - time: 20260318T221414161+0800
+    description: '[click_poco] click UIObjectProxy of "text=确定" result success.'
+phone_info:
+  location: zhuanxian_shanghai_ipv4_ipv6
+  brand: xiaomi
+  model: xiaomi redmi k80
+  os_version: OS2.0.13.0.VOKCNXM
+app_info:
+  app_type: video
+  app_name: mango
+  app_version: 9.0.9
+  app_package: com.hunantv.imgo.activity
+  video:
+    device:
+    - android:///b29154b4
+    pixel: 流畅360P
+    channel: 电影
+    sound: default
+    game: ''
+    camera: ''
+    dev1_camera: false
+    dev2_camera: false
+    dev1_mic: false
+    dev2_mic: false
+    scene: ''
+    frame: null
+    screen_change: ''
+    cloudgame_type: ''
+    live_type: ''
+    switch_duration: 0
+    member_num: 1
+    busy_or_free: busy
+    weekday_or_weekend: weekday
+    device_type: android
+qoe_info:
+  qoe_start_time: 20260318T221618312+0800
+packet_capture:
+  location: upf
+  start_time: 20260318T221435153+0800
+  end_time: 20260318T222218440+0800
+  ipv4_changed: false
+  ipv6_changed: false
+  ipv4:
+  - 19.13.169.10
+  ipv6:
+  - 2408:860c:0:555c:d8e4:16ff:fee4:9bc9
+  - 2025:19:18:1739:54dc:48ff:feb4:42ff
+video_record:
+  start_time: 20260318T221435148+0800
+  end_time: 20260318T222219228+0800
+  height: 0
+  width: 0
+  mute: false
+  fps: 60
+  type: system_record

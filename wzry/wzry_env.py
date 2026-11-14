@@ -143,10 +143,10 @@ class Environment:
             time.sleep(args.observation_delay_sec)
 
         observe_started_at = time.perf_counter()
-        next_state = self.android_controller.screenshot_window()
+        next_state = self.android_controller.capture_state()
         while next_state is None or next_state.size == 0:
             time.sleep(0.01)
-            next_state = self.android_controller.screenshot_window()
+            next_state = self.android_controller.capture_state()
         observe_ms = (time.perf_counter() - observe_started_at) * 1000
 
         step_latency_ms = (time.perf_counter() - execute_started_at) * 1000

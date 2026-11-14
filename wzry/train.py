@@ -4,26 +4,82 @@ import time
 
 import cv2
 import numpy as np
+# ONNX Runtime must initialize before PyQt5 loads its Windows DLLs.
+from onnxRunner import OnnxRunner
 from android_tool import AndroidTool
 from argparses import args
 from dqnAgent import DQNAgent
 from getReword import GetRewordUtil
 from globalInfo import GlobalInfo
+from lifecycle import (
+    EXIT_BUSINESS_ERROR,
+    EXIT_ENV_ERROR,
+    EXIT_OK,
+    EXIT_STOPPED,
+    EXIT_TIMEOUT,
+    ExternalLifecycle,
+    RunAbort,
+)
 from metrics_logger import StepMetricsLogger
 
 from wzry_env import Environment
-from onnxRunner import OnnxRunner
 from traffic_probe import build_traffic_probe
 
 # 全局状态
 globalInfo = GlobalInfo()
 
-class_names = ['started']
-start_check = OnnxRunner('models/start.onnx', classes=class_names)
+lifecycle = ExternalLifecycle(
+    enabled=args.mode == "external",
+    event_file=args.event_file,
+    stop_file=args.stop_file,
+    timeout=args.timeout,
+    run_id=args.run_id,
+    match_ready_timeout=args.match_ready_timeout,
+)
 
-rewordUtil = GetRewordUtil()
-tool = AndroidTool()
-tool.show_scrcpy()
+if args.mode == "external":
+    missing = [
+        name
+        for name, value in (
+            ("--device-id", args.external_device_id or args.iphone_id),
+            ("--event-file", args.event_file),
+            ("--stop-file", args.stop_file),
+            ("--timeout", args.timeout),
+        )
+        if value is None
+    ]
+    if missing:
+        lifecycle.emit_error(
+            stage="arguments",
+            message="external mode missing parameters: " + ", ".join(missing),
+        )
+        lifecycle.emit_stopped(reason="argument_error")
+        raise SystemExit(EXIT_ENV_ERROR)
+    if args.timeout <= 0:
+        lifecycle.emit_error(stage="arguments", message="--timeout must be positive")
+        lifecycle.emit_stopped(reason="argument_error")
+        raise SystemExit(EXIT_ENV_ERROR)
+    if args.external_device_id:
+        args.iphone_id = args.external_device_id
+
+lifecycle.emit_started(device_id=args.iphone_id, mode=args.mode)
+
+try:
+    class_names = ['started']
+    start_check = OnnxRunner('models/start.onnx', classes=class_names)
+    rewordUtil = GetRewordUtil()
+    tool = AndroidTool()
+    if args.mode != "external" or args.external_screenshot_source == "window":
+        tool.show_scrcpy()
+except Exception as exc:
+    lifecycle.emit_error(stage="environment", message=exc)
+    lifecycle.emit_stopped(reason="environment_error")
+    raise SystemExit(EXIT_ENV_ERROR)
+
+lifecycle.emit_device_ready(
+    device_id=args.iphone_id,
+    resolution=f"{tool.actual_width}x{tool.actual_height}",
+)
 # tool.show_action_log()
 traffic_probe = build_traffic_probe(tool)
 env = Environment(tool, rewordUtil, traffic_probe=traffic_probe)
@@ -33,9 +89,11 @@ atexit.register(metrics_logger.close)
 agent = DQNAgent()
 
 def data_collector():
+    lifecycle.emit_waiting()
     while True:
+        lifecycle.check()
         # 获取当前的图像
-        state = tool.screenshot_window()
+        state = tool.capture_state()
         # 保证图像能正常获取
         if state is None:
             time.sleep(0.01)
@@ -49,12 +107,15 @@ def data_collector():
         if checkGameStart == 'started':
             print("-------------------------------对局开始-----------------------------------")
             globalInfo.set_game_start()
+            lifecycle.emit_match_ready(source="start_model")
             env.reset_episode()
             agent.reset_episode()
             episode_step = 0
+            match_exit_missing_streak = 0
 
             # 对局开始了，进行训练
             while globalInfo.is_start_game():
+                lifecycle.check()
                 # 获取预测动作
                 select_started_at = time.perf_counter()
                 action = agent.select_action(state)
@@ -71,6 +132,23 @@ def data_collector():
                     )
 
                 next_state, reward, done, info = env.step(action, state)
+                if (
+                    done == 0
+                    and args.mode == "external"
+                    and args.match_exit_detect_enabled
+                    and episode_step >= args.match_exit_min_step
+                    and episode_step % max(1, args.match_exit_check_interval_steps) == 0
+                ):
+                    in_match_signal = start_check.get_max_label(next_state) == "started"
+                    if in_match_signal:
+                        match_exit_missing_streak = 0
+                    else:
+                        match_exit_missing_streak += 1
+                    if match_exit_missing_streak >= args.match_exit_confirm_steps:
+                        done = 1
+                        info["event"] = "match_exit_detected"
+                        info["match_exit_missing_streak"] = match_exit_missing_streak
+                        print("-------------------------------对局结束(局内信号消失)-----------------------------------")
                 info["policy_source"] = policy_info.get("source")
                 info["macro_action"] = policy_info.get("macro")
                 if args.step_timing_debug:
@@ -193,7 +271,21 @@ def data_collector():
                 # 对局结束
                 if done == 1:
                     print("-------------------------------对局结束-----------------------------------")
+                    finish_event = info.get("event")
+                    if finish_event == "successes":
+                        match_result, match_result_source = "win", "event_mapping"
+                    elif finish_event == "failed":
+                        match_result, match_result_source = "loss", "event_mapping"
+                    else:
+                        match_result, match_result_source = rewordUtil.classify_match_result(next_state)
+                    lifecycle.emit_match_finished(
+                        event=finish_event,
+                        result=match_result,
+                        result_source=match_result_source,
+                    )
                     globalInfo.set_game_end()
+                    if args.mode == "external":
+                        return
                     break
 
                 # 追加经验
@@ -220,7 +312,31 @@ def train_agent():
             count = 1
 
 
-if __name__ == '__main__':
-    training_thread = threading.Thread(target=train_agent)
+def main():
+    training_thread = threading.Thread(target=train_agent, daemon=True)
     training_thread.start()
-    data_collector()
+    try:
+        data_collector()
+    except RunAbort as exc:
+        if exc.code == EXIT_TIMEOUT:
+            lifecycle.emit_error(
+                stage=exc.stage or "timeout",
+                message=exc.message,
+            )
+        lifecycle.emit_stopped(reason=exc.reason)
+        return exc.code
+    except KeyboardInterrupt:
+        lifecycle.emit_stopped(reason="keyboard_interrupt")
+        return EXIT_STOPPED
+    except Exception as exc:
+        lifecycle.emit_error(stage="internal", message=exc)
+        lifecycle.emit_stopped(reason="internal_error")
+        return EXIT_BUSINESS_ERROR
+
+    reason = "match_finished" if args.mode == "external" else "completed"
+    lifecycle.emit_stopped(reason=reason)
+    return EXIT_OK
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

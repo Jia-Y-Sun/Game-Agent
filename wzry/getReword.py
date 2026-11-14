@@ -342,6 +342,35 @@ class GetRewordUtil:
                 break
         return done, class_name
 
+    def classify_match_result(self, image):
+        try:
+            results = self.text_sys.detect_and_ocr(image)
+        except Exception:
+            return "unknown", "ocr_error"
+
+        texts = [
+            str(getattr(item, "ocr_text", "")).strip()
+            for item in results
+            if str(getattr(item, "ocr_text", "")).strip()
+        ]
+        joined = " ".join(texts).upper()
+
+        result_keywords = (
+            ("win", ("胜利", "VICTORY", "完胜", "胜利者")),
+            ("loss", ("失败", "DEFEAT", "惜败", "败方")),
+            ("draw", ("平局", "DRAW")),
+        )
+        for result, keywords in result_keywords:
+            for keyword in keywords:
+                if keyword.upper() in joined:
+                    return result, "settlement_ocr"
+
+        practice_keywords = ("分路表现", "团队贡献", "点击此处继续")
+        if any(keyword in joined for keyword in practice_keywords):
+            return "practice", "training_settlement"
+
+        return "unknown", "no_result_keywords"
+
     def check_death(self, image):
         check_game_death = self.death_check.get_max_label(image)
         if check_game_death == 'death':

@@ -1,0 +1,35 @@
+devices:
+- id: b29154b4
+  brand: xiaomi
+  model: redmi k80
+  location: lab_shanghai
+apps:
+- name: mango
+  scenes:
+  - name: movie
+    resolutions:
+    - 流畅360P
+    - 高清720P
+    - 超清1080P
+    duration: 600
+  - name: tv_series
+    resolutions:
+    - 流畅360P
+    - 高清720P
+    duration: 600
+- name: honorofkings
+  scenes:
+  - name: battle
+    duration: 900
+  - name: lobby
+    duration: 300
+- name: wechat
+  scenes:
+  - name: video_call
+    duration: 300
+  - name: voice_call
+    duration: 300
+schedule:
+  repeat: 3
+  interval: 60
+output_dir: ./batch_data

@@ -28,3 +28,10 @@ Sunflower/
 # --- jinchanchan 运行时产物 ---
 jinchanchan/logs/
 jinchanchan/images/screenshots/
+
+# --- 平台集成 ---
+jcc-auto-probe/
+Sunflower/
+minipilot-main/.venv/
+minipilot-main/runs/
+minipilot-main/mini_pilot.config.json

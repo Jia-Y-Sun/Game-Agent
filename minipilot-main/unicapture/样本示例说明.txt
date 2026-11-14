@@ -1,0 +1,63 @@
+安卓端侧APP样本采集输出文件说明
+================================
+
+本说明描述一次完整采集后生成的 6 种标准文件及其格式。
+
+1. 流量报文 pcap
+----------------
+文件名示例：cut_mango_b29154b4_movie_liuchang360P_10_20260318T221434.pcap
+文件名格式：{应用行为}_{手机编号}_{场景}_{分辨率}_{时长}_{采集时间}.pcap
+说明：
+- 包含目标业务期间的完整网络报文。
+- root 模式通过 tcpdump 抓取，无 root 模式通过 PCAPdroid 等 VpnService App 抓取。
+- 若文件过大，可只截取前 N 个报文作为示例。
+
+2. 环境信息 yaml
+----------------
+文件名示例：mango_b29154b4_movie_liuchang360P_10_20260318T221434.yaml
+说明：记录采集环境和操作过程，主要包含：
+① task_info：手机操作记录
+② phone_info：手机品牌、型号、OS 版本
+③ app_info：拨测应用、任务类型、板块等信息
+④ qoe_info：QoE 业务触发起始时间
+⑤ packet_capture：pcap 信息，需重点记录用户 IPv4/IPv6
+⑥ video_record：录屏文件开始和结束时间
+
+3. SA 流标注 csv
+----------------
+文件名示例：mango_b29154b4_movie_liuchang360P_10_20260318T221434_sa.csv
+必要列：pcap 名字、拨测应用大类、拨测应用名字、源 IP(srcip)、目的 IP(dstip)、
+        源端口(srcport)、目的端口(dstport)、传输层协议(l4proto)、
+        是否是业务流(not_in_app)、标注结果(egn_sub_protocol)
+
+4. QoE 关键指标 csv
+-------------------
+文件名示例：mango_b29154b4_movie_liuchang360P_10_20260318T221434_qoe.csv
+说明：目标业务开始后，每秒标注一次 QoE 关键指标：
+① trust_stall：单位时间是否出现卡顿。0=不卡，1=卡顿，<0=目标业务未开始
+② trust_resolution：分辨率（如果业务涉及）。<0=目标业务未开始
+③ rtt：时延（仅手游）。<0=目标业务未开始
+
+5. 屏幕录屏文件
+---------------
+文件名示例：mango_b29154b4_movie_liuchang360P_10_20260318T221434.mp4
+说明：
+- 从采集流量开始时同步录制。
+- 要求录屏包含完整业务行为。
+- 默认输出格式为 mp4，具体编码由设备 screenrecord 决定。
+- 若文件过大，可只保留前 1 分钟作为示例。
+
+6. 系统日志 log
+---------------
+文件名示例：mango_b29154b4_movie_liuchang360P_10_20260318T221434.log
+说明：
+- 从采集流量开始时同步抓取 adb logcat。
+- 需要 READ_LOGS 权限或 root 权限才能完整获取。
+- 若无法获取，该文件可能为空或缺失。
+
+生成方式
+--------
+执行主采集脚本即可自动生成上述文件：
+    python app_collector.py --app-name mango --scene movie --duration 600
+
+更多细节请参考：README.md、安卓端侧APP样本采集方案.md、SAMPLE_FORMAT.md

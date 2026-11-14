@@ -1,0 +1,19 @@
+# MiniPilot and Unicapture mandatory Python dependencies.
+# External tools and phone apps such as adb, scrcpy, FFmpeg, tcpdump,
+# ADBKeyboard and the customized PCAPdroid are not pip packages.
+
+# Agent and model client
+Pillow>=10.0.0
+openai>=1.0.0
+
+# Capture metadata and packet processing
+PyYAML>=6.0
+scapy>=2.5.0
+
+# Real-time and offline QoE processing
+opencv-python>=4.8.0
+numpy>=1.24.0
+rapidocr-onnxruntime>=1.4.4
+
+# Optional live OCR enhancement (also requires the Tesseract executable):
+# pytesseract>=0.3.10

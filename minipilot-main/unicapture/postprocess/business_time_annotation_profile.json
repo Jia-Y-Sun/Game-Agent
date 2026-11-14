@@ -1,0 +1,18 @@
+{
+  "profile_purpose": "business_time_annotation",
+  "profile_version": "1.0",
+  "capture_control_package": "com.emanuelef.remote_capture",
+  "capture_control_activity": "CaptureCtrl",
+  "candidate_window_seconds": 120,
+  "standard_start_distance_seconds": 90,
+  "displayed_start_distance_seconds": 30,
+  "end_distance_seconds": 15,
+  "support_window_seconds": 10,
+  "minimum_business_duration_seconds": 30,
+  "minimum_confidence": "low",
+  "fill_missing_from_video_record": true,
+  "only_missing_business": true,
+  "require_mp4": true
+}
+
+

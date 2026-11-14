@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_samples_path": "E:\\srtp\\boce\\wzry_ai-main\\human_data\\lane_hold_demo\\samples.jsonl",
+  "source_samples_path": "human_data/lane_hold_demo/samples.jsonl",
   "profile_step_sec": 0.5,
   "record_count": 59,
   "opening_move_only_profile": true,

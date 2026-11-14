@@ -1,121 +1,59 @@
-<p align="center">
-    <a href="https://github.com/myBoris/wzry_ai">
-        <img src="https://socialify.git.ci/myBoris/wzry_ai/image?description=1&font=Rokkitt&language=1&name=1&owner=1&theme=Auto" alt="wzry_ai"/>    
-    </a>
-</p>
+# 王者荣耀拨测执行器
 
-<p align="center">
-    <a href="https://github.com/myBoris/wzry_ai/stargazers">
-        <img src="https://img.shields.io/github/stars/myBoris/wzry_ai?style=flat-square&label=STARS&color=%23dfb317" alt="stars">
-    </a>
-    <a href="https://github.com/myBoris/wzry_ai/network/members">
-        <img src="https://img.shields.io/github/forks/myBoris/wzry_ai?style=flat-square&label=FORKS&color=%2397ca00" alt="forks">
-    </a>
-    <a href="https://github.com/myBoris/wzry_ai/issues">
-        <img src="https://img.shields.io/github/issues/myBoris/wzry_ai?style=flat-square&label=ISSUES&color=%23007ec6" alt="issues">
-    </a>
-    <a href="https://github.com/myBoris/wzry_ai/pulls">
-        <img src="https://img.shields.io/github/issues-pr/myBoris/wzry_ai?style=flat-square&label=PULLS&color=%23fe7d37" alt="pulls">
-    </a>
-</p>
+本目录从本机 Game-Agent 的王者项目迁入，接入同仓库采集总控。当前默认尝试路径是已登录游戏 → 大厅 → 单人练习场 → 局内执行 → 结束识别 → 采集后处理。整合版尚未重新执行实机全流程，详细状态见 [实现与验证状态](../../docs/IMPLEMENTATION_STATUS.md)。
 
----
+## 环境与模型
 
->声明:本项目的目的是为了学习人工智能，严禁外挂
+从仓库根目录执行。王者使用独立 Python 3.10，不与金铲铲/采集环境混装。以下 CUDA 12.1 PyTorch 版本对应本机已有部署；新机器安装及驱动兼容性尚未重新验收：
 
-### 一、项目简介
-
-- 这是一个开源的人工智能模型玩王者荣耀的项目。
-- 同时第一期想做的工程全部完成了，以后将在这个基础上进行升级
-- 第二期工程已经开工，预祝按计划进行
-- 如果有问题，欢迎指导
-```
-  文章网址
-  https://stack-traceable.top/
-
-  qq交流群1:687853827 已满，请加2,3群
-  qq交流群2:369509470 
-  qq交流群3:566501058
-
-  
-  
-  环境安装详细教程，在doc/说明文档.md里面
-  环境安装视频:(bilibili) 欢迎来关注up，点赞，投币，评论，提出你的建议
-  https://www.bilibili.com/video/BV1ZXYuePEUG/?spm_id_from=333.999.0.0&vd_source=c31e7165590bf9282be67774f1d2e36c
+```powershell
+py -3.10 -m venv .\game-agent\wzry\.venv
+& .\game-agent\wzry\.venv\Scripts\python.exe -m pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+& .\game-agent\wzry\.venv\Scripts\python.exe -m pip install -r .\game-agent\wzry\requirements.txt
 ```
 
-<br>
+需要另外准备以下文件，相对路径均以本目录为基准：
 
-### 二、环境配置教程
+| 文件 | 用途 |
+| --- | --- |
+| `models/start.onnx` | 对局开始/局内状态识别 |
+| `models/death.onnx` | 死亡状态识别 |
+| `src/wzry_ai_bc.pt` | 当前局内策略权重 |
 
-- 1.下载anaconda并安装<br>
-   下载地址:
-   ```
-     https://www.anaconda.com/download
-   ```
-- 2.使用anaconda创建一个环境<br>
-    命令: 
-    ```
-      conda create --name wzry_ai python=3.10
-   ```
-- 3.激活这个环境<br>
-    命令:
-    ```
-      conda activate wzry_ai
-    ```
-- 4.在wzry_ai环境安装必要的包<br>
-  1. 执行下面环境安装命令<br>
-     ```
-     pip install -r requirements.txt
-     ```
-  2. 执行下面环境命令pytorch和cuda
-     ```
-     pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-     ```
-  3. 执行下面环境命令安装onnxruntime-gpu<br>
-     如果cuda是11
-     ```
-     pip install onnxruntime-gpu
-     ```
-     如果cuda是12<br>
-     ```
-      pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
-     ```
-  4. onnxruntime-gpu的运行时如果出现下面问题
-     ```
-     Could not locate zlibwapi.dll. Please make sure it is in your library path!
-     ```
-     解决方法:<br> 
-     复制下面文件夹的文件: (2022.4.2这个可能不一样，按照你自己系统就行，Nsight Systems这个是一样的)<br>
-     ``` 
-     C:\Program Files\NVIDIA Corporation\Nsight Systems 2022.4.2\host-windows-x64\zlib.dll
-     ```
-     复制到这个文件夹，并且改名为: zlibwapi:<br> 
-     ```
-     C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\bin\zlibwapi.dll
-     ```
-     <br>
+[assets.example.json](assets.example.json) 记录本机快照的文件大小与 SHA-256。**模型未上传，尚无已验证的公共下载入口或自动下载脚本。** 需要由维护者提供获准使用的模型；再分发条件仍待确认。全新 clone 不能直接开始实机拨测。
 
-### 三、训练教程
+```powershell
+& .\game-agent\wzry\.venv\Scripts\python.exe .\game-agent\wzry\check_runtime.py --verify-hashes
+```
 
-- 将下载的onnx模型放在models目录下，直接运行train.py,会自己训练生成模型(wzry_ai.pt)
-- 可以通过顶部的qq群或者网址下载
-- https://stack-traceable.top/archives/wzry-ai-model
-- 生成的模型会放在[src](src)目录下
+此命令只检查模型、依赖导入和 CUDA 可用性，不操作游戏。启动脚本也会执行基础预检，但默认不重复计算约 1 GB 模型的哈希。`-ComputeDevice cpu` 可显式选择 CPU，性能未验证。自定义 `-ModelPath` 仍需与策略网络结构兼容，自定义模型没有快照校验值。
 
-<br>
+采集环境、配置、ADB、scrcpy、FFmpeg 和设备端 PCAPdroid/tcpdump 按 [根目录部署说明](../../README.md) 准备。当前布局依据雷电 `1920x1080` 校准。生产运行的 ADB 优先级为显式参数、`MINI_PILOT_ADB_BIN`、PATH，最后才尝试旧版随附目录。
 
-### 四、在真机和模拟器上的配置
+## 启动
 
-- 修改按键映射，按键映射在这个文件里[argparses.py](src/common/argparses.py)<br>
-- 修改这里的position，这里是操控位置(X,Y)在屏幕宽高的的百分比，理论讲王者的百分比位置是固定的，一般不用改，对不上时需要更改<br>
-  ![position.png](images%2Fposition.png)<br><br>
+```powershell
+$env:MINI_PILOT_ADB_BIN = 'D:\leidian\LDPlayer14\adb.exe' # 按实际安装修改
+.\game-agent\wzry\run_capture_probe.ps1 -DryRun -DeviceId 'emulator-5554' -RunId wzry-preview
+.\game-agent\wzry\run_capture_probe.ps1 -DeviceId 'emulator-5554' -RunId wzry-round-01
+```
 
-- 运行[showposition.py](src/common/other/showposition.py)<br>
-- 点击图片的位置，下方会有结果，把里面的值填到[argparses.py](src/common/argparses.py)当中就行，下图点击的是移动按钮的位置<br><br>
-  ![showposition.png](images%2Fshowposition.png)
+`-DryRun` 只显示命令，不检查依赖，也不执行 ADB。脚本默认使用同仓库采集目录和本目录 `.venv`；可用 `MINI_PILOT_ROOT`、`-GamePython` 覆盖。`-DisablePostprocess` 跳过后处理，报告会注明不完整；`-SkipPcapdroidPreflight` 只供已确认采集方式的环境使用，不能替代抓包验证。
 
+两轮试验入口（代码已实现，本版本实机连续运行未验证）：
 
-<br>
+```powershell
+.\game-agent\wzry\run_capture_probe.ps1 -Rounds 2 -SessionId wzry-two-rounds
+```
 
-#### 注：开源不易，共同努力。
+## 能力边界
+
+- 已登录“开始游戏”页面有识别规则；真实登录、验证码、实名和支付页会请求人工接管。登录到大厅的无人干预闭环尚未验收。
+- 活动页仅在标题与角落明确关闭文字同时满足规则时点击；复用本轮 OCR，减少重复识别。纯图标关闭、模板匹配后备策略尚未实现，ROI 关闭速度未做新实测。
+- 前置驱动针对训练营/练习场导航；`-PregameGoal` 不是任意自然语言任务引擎，仅影响预设导航模式。单独运行该驱动也不提供“到大厅即停”的专用模式。
+- 结束判断可能使用局内信号消失兜底，结果记 `unknown`；不能当作胜负识别成功。
+- 画面长时间无法识别时仍有返回键恢复策略，其他分辨率、活动版式和异常断线场景未全面验证。
+
+原研究代码、训练/标注工具和历史文档随源码保留，未全部适配统一部署。例如 `human_data_collector.py` 仍有旧随附 ADB 路径；它不在正式拨测链路中。旧 `README_NEW.md` 和设计笔记描述的是历史实验，不作为本版本验收证据。
+
+接口细节见 [CAPTURE_INTEGRATION.md](CAPTURE_INTEGRATION.md)。迁入前 README 保留在 [README_UPSTREAM.md](README_UPSTREAM.md)，原项目署名与来源见 [来源说明](../../docs/SOURCE_NOTES.md)。

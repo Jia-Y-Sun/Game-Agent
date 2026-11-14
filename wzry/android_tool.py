@@ -13,15 +13,28 @@ import concurrent.futures
 import cv2
 import numpy as np
 import win32gui
+import PyQt5
+
+_QT_PLATFORM_PLUGIN_PATH = os.path.join(
+    os.path.dirname(PyQt5.__file__),
+    "Qt5",
+    "plugins",
+    "platforms",
+)
+if os.path.isdir(_QT_PLATFORM_PLUGIN_PATH):
+    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = _QT_PLATFORM_PLUGIN_PATH
+
 from PyQt5.QtGui import QImage
 from PyQt5.QtWidgets import QApplication
 
 from argparses import move_actions_detail, info_actions_detail, attack_actions_detail, args
+from runtime_paths import resolve_adb
 
 
 class AndroidTool:
     def __init__(self, scrcpy_dir="scrcpy-win64-v2.0"):
         self.scrcpy_dir = scrcpy_dir
+        self.adb_path = resolve_adb(bundled_dir=scrcpy_dir)
         self.device_serial = args.iphone_id
         self.actual_height, self.actual_width = self.get_device_resolution()
         if args.move_debug:
@@ -54,7 +67,7 @@ class AndroidTool:
         self._show_action_log = False
 
     def get_device_resolution(self):
-        adb_path = f"{self.scrcpy_dir}/adb"
+        adb_path = self.adb_path
         command = [adb_path, "-s", self.device_serial, "shell", "wm", "size"]
         last_error = None
 
@@ -104,7 +117,7 @@ class AndroidTool:
                                                    task_params['angle'])
             duration_ms = int(task_params.get("duration_ms", args.move_swipe_duration_ms))
 
-            subprocess.run([f"{self.scrcpy_dir}/adb", "-s", self.device_serial, "shell",
+            subprocess.run([self.adb_path, "-s", self.device_serial, "shell",
                             "input", "swipe", str(start_x), str(start_y), str(end_x), str(end_y),
                             str(max(1, duration_ms))])
             return True
@@ -148,7 +161,7 @@ class AndroidTool:
         try:
             result = subprocess.run(
                 [
-                    f"{self.scrcpy_dir}/adb",
+                    self.adb_path,
                     "-s",
                     self.device_serial,
                     "shell",
@@ -254,7 +267,7 @@ class AndroidTool:
         try:
             result = subprocess.run(
                 [
-                    f"{self.scrcpy_dir}/adb",
+                    self.adb_path,
                     "-s",
                     self.device_serial,
                     "shell",
@@ -315,7 +328,7 @@ class AndroidTool:
             try:
                 self._move_process = subprocess.Popen(
                     [
-                        f"{self.scrcpy_dir}/adb",
+                        self.adb_path,
                         "-s",
                         self.device_serial,
                         "shell",
@@ -373,7 +386,7 @@ class AndroidTool:
             press_x, press_y = (end_x, end_y) if args.persistent_move_press_endpoint else (start_x, start_y)
             hold_ms = int(max(args.move_swipe_duration_ms, args.persistent_move_hold_ms))
             command = [
-                f"{self.scrcpy_dir}/adb",
+                self.adb_path,
                 "-s",
                 self.device_serial,
                 "shell",
@@ -536,7 +549,7 @@ class AndroidTool:
         start_x, start_y = self.calculate_startpoint(self._move_center_position(actions_detail))
         radius = int(task_params.get("radius", args.move_joystick_radius or actions_detail["radius"]))
         end_x, end_y = self.calculate_endpoint((start_x, start_y), radius, task_params["angle"])
-        adb_prefix = [f"{self.scrcpy_dir}/adb", "-s", self.device_serial, "shell", "input", "motionevent"]
+        adb_prefix = [self.adb_path, "-s", self.device_serial, "shell", "input", "motionevent"]
 
         subprocess.run([*adb_prefix, "DOWN", str(start_x), str(start_y)])
         time.sleep(max(0.01, args.move_motionevent_settle_ms / 1000.0))
@@ -557,7 +570,7 @@ class AndroidTool:
             if self._show_action_log:
                 print(actions_detail['action_name'])
             start_x, start_y = self.calculate_startpoint(actions_detail['position'])
-            subprocess.run([f"{self.scrcpy_dir}/adb", "-s", self.device_serial, "shell",
+            subprocess.run([self.adb_path, "-s", self.device_serial, "shell",
                             "input", "tap", str(start_x), str(start_y)])
             return True
         return False
@@ -576,21 +589,21 @@ class AndroidTool:
                 print(actions_detail['action_name'])
             start_x, start_y = self.calculate_startpoint(actions_detail['position'])
             if action_index < 7:
-                subprocess.run([f"{self.scrcpy_dir}/adb", "-s", self.device_serial, "shell",
+                subprocess.run([self.adb_path, "-s", self.device_serial, "shell",
                                 "input", "tap", str(start_x), str(start_y)])
             else:
                 if action_type == 0:
-                    subprocess.run([f"{self.scrcpy_dir}/adb", "-s", self.device_serial, "shell",
+                    subprocess.run([self.adb_path, "-s", self.device_serial, "shell",
                                     "input", "tap", str(start_x), str(start_y)])
                 elif action_type == 1:
                     end_x, end_y = self.calculate_endpoint((start_x, start_y),
                                                            arg2,
                                                            arg1)
-                    subprocess.run([f"{self.scrcpy_dir}/adb", "-s", self.device_serial, "shell",
+                    subprocess.run([self.adb_path, "-s", self.device_serial, "shell",
                                     "input", "swipe", str(start_x), str(start_y), str(end_x), str(end_y),
                                     str(args.skill_swipe_duration_ms)])
                 else:
-                    subprocess.run([f"{self.scrcpy_dir}/adb", "-s", self.device_serial, "shell",
+                    subprocess.run([self.adb_path, "-s", self.device_serial, "shell",
                                     "input", "swipe", str(start_x), str(start_y), str(start_x), str(start_y),
                                     str(arg3 * args.long_press_unit_ms)])
             return True
@@ -920,7 +933,7 @@ class AndroidTool:
 
     def _adb(self, extra_args, timeout=None):
         return subprocess.run(
-            [f'{self.scrcpy_dir}/adb', '-s', self.device_serial, *extra_args],
+            [self.adb_path, '-s', self.device_serial, *extra_args],
             capture_output=True,
             text=False,
             timeout=timeout,
@@ -1053,6 +1066,13 @@ class AndroidTool:
             print(f"An unexpected error occurred: {e}")
 
         return None
+
+    def capture_state(self):
+        if args.mode == "external" and args.external_screenshot_source == "adb":
+            image = self.take_screenshot()
+            if image is not None:
+                return image
+        return self.screenshot_window()
 
     def screenshot_window(self):
         """

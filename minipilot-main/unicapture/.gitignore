@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+.venv*/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Output directories (keep directory structure but ignore contents)
+data/*
+!data/.gitkeep
+test_data/*
+!test_data/.gitkeep
+runs/*
+!runs/.gitkeep
+qoe_data/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local backup files
+*-beifen.py
+*-backup.*
+*.bak

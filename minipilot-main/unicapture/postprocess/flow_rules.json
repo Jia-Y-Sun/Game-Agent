@@ -1,0 +1,63 @@
+{
+  "ad_rules": [
+    "pangolin-sdk-toutiao.com",
+    "pglstatp-toutiao.com",
+    "doubleclick.net",
+    "googlesyndication.com",
+    "googleadservices.com",
+    "gdt.qq.com",
+    "e.qq.com",
+    "cupid.iqiyi.com"
+  ],
+  "sdk_rules": [
+    {
+      "vendor": "Firebase",
+      "domains": ["firebaseio.com", "firebaseinstallations.googleapis.com", "app-measurement.com", "crashlytics.com"]
+    },
+    {
+      "vendor": "Google Analytics",
+      "domains": ["google-analytics.com", "googletagmanager.com"]
+    },
+    {
+      "vendor": "Adjust",
+      "domains": ["adjust.com"]
+    },
+    {
+      "vendor": "AppsFlyer",
+      "domains": ["appsflyer.com"]
+    },
+    {
+      "vendor": "Umeng",
+      "domains": ["umeng.com", "umengcloud.com", "umsns.com"]
+    },
+    {
+      "vendor": "Bugly",
+      "domains": ["bugly.qq.com"]
+    },
+    {
+      "vendor": "ByteDance APM",
+      "domains": ["apmplus.volces.com", "mssdk3-normal-hj.zijieapi.com"]
+    }
+  ],
+  "first_party_rules": {
+    "douyin": ["douyin.com", "amemv.com", "byteimg.com", "bytecdn.com", "bytegecko.com", "zijieapi.com", "snssdk.com", "toutiao.com"],
+    "kuaishou": ["kuaishou.com", "gifshow.com", "kwaicdn.com", "kwimgs.com", "kwaiselfcdn.com", "ksapisrv.com"],
+    "huya_live": ["huya.com", "dcloudlive.com"],
+    "bilibili": ["bilibili.com", "bilivideo.com", "bilicdn1.com", "bilicdn2.com", "hdslb.com"],
+    "tencent_video": ["v.qq.com", "video.qq.com", "gtimg.cn"],
+    "iqiyi": ["iqiyi.com", "qiyi.com", "qiyipic.com"],
+    "mobile_yy": ["yy.com", "bigda.com", "jomodns.com"],
+    "qq_voice": ["qq.com", "tencent.com", "tencent-cloud.net"],
+    "tencent_meeting": ["meeting-tencent.com", "qcloud.com", "tencent.com", "tencent-cloud.net"],
+    "dingtalk": ["dingtalk.com", "alibabacorp.com", "taobao.com", "alibabadns.com"],
+    "honorofkings": ["qq.com", "tencent.com", "tencent-cloud.net", "tdnsdl1.cn"],
+    "genshin": ["mihoyo.com", "yuanshen.com", "hoyoverse.com"],
+    "wechat": ["weixin.qq.com", "wechat.com", "wechatpay.cn", "tencent.com", "tencent-cloud.net"],
+    "qq": ["qq.com", "tencent.com", "tencent-cloud.net"],
+    "xiaohongshu": ["xiaohongshu.com", "xhscdn.com"],
+    "xiaohongshu_news": ["xiaohongshu.com", "xhscdn.com"],
+    "tencent_news": ["inews.qq.com", "gtimg.com", "tencent.com", "tencent-cloud.net"],
+    "deepseek": ["deepseek.com", "deepseek.cn"],
+    "doubao_ai": ["doubao.com", "volces.com", "byte008.com", "zijieapi.com", "feishu.cn"]
+  }
+}

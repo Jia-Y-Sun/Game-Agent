@@ -1,0 +1,3 @@
+# Unicapture is distributed as part of MiniPilot. Keep one authoritative
+# dependency list so integrated collection and post-processing cannot drift.
+-r ../requirements.txt

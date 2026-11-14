@@ -1,0 +1,72 @@
+{
+  "runs_dir": "runs",
+  "runtime": { "max_loops": 100 },
+  "executor": {
+    "active_profile": "seed2pro",
+    "profiles": {
+      "autoglm": {
+        "base_url": "https://open.bigmodel.cn/api/paas/v4/",
+        "model": "AutoGLM-Phone",
+        "api_key": "YOUR_AUTOGLM_API_KEY",
+        "temperature": 0.0,
+        "max_tokens": 1024,
+        "image_max_side": 2048
+      },
+      "seed2pro": {
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3/",
+        "model": "doubao-seed-2-0-pro-260215",
+        "api_key": "YOUR_SEED2PRO_API_KEY",
+        "temperature": 0.0,
+        "max_tokens": 1024,
+        "image_max_side": 1024
+      }
+    }
+  },
+  "capture": {
+    "enabled": true,
+    "backend": "unicapture",
+    "auto_infer": true,
+    "mode": "noroot",
+    "pcap_mode": "standard",
+    "location": "default",
+    "pcapdroid_preflight": false,
+    "pcapdroid_api_key": "YOUR_PCAPDROID_API_KEY",
+    "operation_mode": "agent",
+    "enable_postprocess": true,
+    "postprocess_enable_vlm": true,
+    "postprocess_vlm_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "postprocess_vlm_api_key": "YOUR_POSTPROCESS_VLM_API_KEY",
+    "postprocess_vlm_model": "qwen-vl-plus",
+    "postprocess_vlm_every": 5,
+    "postprocess_vlm_max_calls": 20,
+    "enable_flow_labeling": true
+  },
+  "operation_style": {
+    "enabled": true,
+    "persona": "你是一个模拟真人操作的应用使用者，不是机械重复动作的脚本。",
+    "principles": [
+      "最高优先级始终是不可变的原始用户目标。",
+      "像一个正在认真使用应用的真实用户一样操作，而不是像脚本一样重复同一个手势。",
+      "除非用户明确要求只滑动、只观看或只等待，否则不要把较长时间任务执行成连续滑动、连续等待或停留在外层页面的机械循环。",
+      "当用户目标留有自由判断空间时，外层浏览只是过程的一部分；应当周期性进入安全、可返回、符合目标的具体内容、详情页、评论区、主页、标签页、筛选项或相关面板短暂查看。",
+      "形成像真人一样的深浅切换节奏：外层浏览一会儿，进入具体内容或二级视图看一看，然后返回主任务路线继续。",
+      "如果最近多次动作都是同一种外层浏览动作，要主动改变操作层级，而不是继续重复。",
+      "在安全、可返回、且符合目标的情况下，使用当前屏幕上可见的应用内原生控件。",
+      "当符合目标和当前屏幕状态时，可以短暂查看二级页面、详情页、评论区、标签页、筛选项、主页、内容详情或相关面板。",
+      "如果只是临时探索某个二级页面，短暂观察后要回到主任务路线，不要在支线里无限游走。",
+      "如果最近行为被某一种动作明显主导，要重新对照原始目标，并自主调整后续行为。"
+    ],
+    "priority_rules": [
+      "用户明确给出的步骤、节奏、目标文本、禁止事项和时间要求，优先级高于这个操作风格。",
+      "如果用户要求的是一个明确的简单操作，就直接完成它，不要额外添加不必要的探索。",
+      "如果用户要求的是一个较长时间、较模糊的应用使用任务，要在保持目标不变的前提下，让过程尽量活跃、多样、像真人，并适当进入可返回的内容内部或二级视图查看。",
+      "如果用户明确要求只观看、只滑动、只等待，或避免其他互动，就严格遵守该要求。"
+    ],
+    "safety_boundaries": [
+      "除非用户明确要求，不要使用私信或分享给联系人。",
+      "除非用户明确要求，不要执行购买、团购、支付、充值、会员、登录、授权、账号绑定或不可逆的账号变更。",
+      "除非与用户明确目标兼容，不要提交表单、发布内容、发送评论、点赞、关注或订阅。",
+      "当屏幕要求敏感选择、支付、登录、权限或身份确认时，不要猜测，使用 Take_over 或 Interact 停下来请求人工处理。"
+    ]
+  }
+}

@@ -34,7 +34,7 @@ class DQNAgent:
         self.criterion = nn.SmoothL1Loss()
 
         if args.model_path and os.path.exists(args.model_path):
-            self.policy_net.load_state_dict(torch.load(args.model_path))
+            self.policy_net.load_state_dict(torch.load(args.model_path, map_location=self.device, weights_only=True))
             self.target_net.load_state_dict(self.policy_net.state_dict())
             print(f"Model loaded from {args.model_path}")
 
