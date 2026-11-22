@@ -121,6 +121,14 @@ class LaneMacroController:
         }
         self.last_macro = "lane_start"
 
+    def default_info(self):
+        """不推进步数的默认 info。
+
+        人为接管期间宏控制器会被冻结，`env` 仍需要一份结构完整的 info 供日志使用，
+        因此这里提供一个零成本的默认视图。
+        """
+        return self._info(False, "opening", "idle")
+
     def refine_action(self, action, target_info, current_state=None, minimap_state=None):
         if not args.lane_macro_enabled:
             return action, self._info(False, "disabled", "off")

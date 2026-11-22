@@ -201,8 +201,22 @@ class TouchActionMapper:
             tracks[(sample.get("slot", 0), tracking_id)].append(sample)
         return tracks
 
+    def _move_center(self):
+        """摇杆中心。
+
+        `AndroidTool._move_center_position` 在执行动作时优先用
+        `--move_joystick_center_x/y` 标定值；把触摸还原成动作时也必须用同一个中心，
+        否则「手指按在摇杆中心不动」会被算成「朝某个方向推」。
+        """
+        if getattr(args, "move_joystick_center_enabled", False):
+            return (
+                self.screen_width * float(args.move_joystick_center_x),
+                self.screen_height * float(args.move_joystick_center_y),
+            )
+        return self._action_center(move_actions_detail[1])
+
     def _map_move(self, samples):
-        center = self._action_center(move_actions_detail[1])
+        center = self._move_center()
         radius = float(move_actions_detail[1].get("radius", 0))
         move_zone_radius = max(radius * 1.4, self.default_hit_radius * 1.8)
         move_samples = [

@@ -1,8 +1,13 @@
 # config.py
 import argparse
 
-import torch
+# 设备端（device_agent.py）只需要截屏/注入/坐标，不装 torch 也能跑
+try:
+    import torch
+except ImportError:  # pragma: no cover - 只在没有 torch 的机器上触发
+    torch = None
 
+import asset_paths
 from globalInfo import GlobalInfo
 
 # 移动坐标和滑动半径
@@ -54,36 +59,35 @@ def str2bool(value):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--iphone_id', type=str, default='10AD880X7Q001RX', help="iphone_id")
-    parser.add_argument('--real_iphone', type=bool, default=True, help="real_iphone")
+    parser.add_argument('--iphone_id', type=str, default='emulator-5554', help="iphone_id")
+    parser.add_argument('--real_iphone', type=bool, default=False, help="real_iphone")
     parser.add_argument('--window_title', type=str, default='wzry_ai', help="window_title")
     parser.add_argument('--device_id', type=str, default='cuda:0', help="device_id")
-    parser.add_argument('--mode', choices=('standalone', 'external'), default='standalone',
-                        help="Run directly or as an external capture-orchestrator driver")
-    parser.add_argument('--device-id', dest='external_device_id', type=str, default=None,
-                        help="ADB serial or endpoint used in external mode")
-    parser.add_argument('--event-file', type=str, default=None,
-                        help="JSONL lifecycle event file used in external mode")
-    parser.add_argument('--stop-file', type=str, default=None,
-                        help="Stop marker consumed by the external lifecycle")
-    parser.add_argument('--timeout', type=float, default=None,
-                        help="Global external-mode timeout in seconds")
-    parser.add_argument('--match-ready-timeout', type=float, default=180.0,
-                        help="Maximum seconds to wait for MATCH_READY in external mode")
-    parser.add_argument('--external_screenshot_source', type=str, default='adb',
-                        choices=['adb', 'window'],
-                        help="Screenshot backend used by the external game driver")
-    parser.add_argument('--run-id', type=str, default=None,
-                        help="Run identifier included in lifecycle events")
     parser.add_argument('--memory_size', type=int, default=10000, help="Replay memory size")
+    parser.add_argument('--memory_ram_limit_gb', type=float, default=8.0,
+                        help="经验池的常驻内存上限(GB): 超过则自动下调 --memory_size; 0 表示不限。"
+                             "640 观测下每条经验约 2.4MB, 8GB 约等于 3300 条")
     parser.add_argument('--batch_size', type=int, default=64, help="Batch size for training")
     parser.add_argument('--learning_rate', type=float, default=0.001, help="Learning rate")
     parser.add_argument('--gamma', type=float, default=0.99, help="Discount factor")
     parser.add_argument('--epsilon', type=float, default=1.0, help="Initial exploration rate")
     parser.add_argument('--epsilon_decay', type=float, default=0.995, help="Exploration rate decay")
     parser.add_argument('--epsilon_min', type=float, default=0.01, help="Minimum exploration rate")
+    parser.add_argument('--epsilon_decay_mode', type=str, default='step', choices=['step', 'replay'],
+                        help="探索率衰减节奏: step=每个环境步衰减一次(推荐); replay=每次训练迭代衰减(旧行为, "
+                             "训练线程满速时会在一分钟内把 epsilon 打到下限)")
+    parser.add_argument('--target_update_mode', type=str, default='step', choices=['step', 'replay'],
+                        help="目标网络同步节奏: step=每个环境步; replay=每次训练迭代(旧行为)")
+    parser.add_argument('--replays_per_env_step', type=float, default=4.0,
+                        help="每个环境步最多允许几次训练迭代; 0 表示不限速(旧行为, 会到 20~30 次/步)")
+    parser.add_argument('--train_time_budget_per_step_sec', type=float, default=0.8,
+                        help="每个环境步最多花多少秒在训练上; legacy 大网络单次迭代约 0.9s, "
+                             "靠它保证训练不把采集饿死; 0 表示不限")
+    parser.add_argument('--reward_scale', type=float, default=0.1,
+                        help="写入经验前对奖励乘的系数; 1.0 为原值, 0.1 可避免 Q 撞上 TD 裁剪上限")
     parser.add_argument('--model_path', type=str, default="src/wzry_ai.pt", help="Path to the model to load")
-    parser.add_argument('--num_episodes', type=int, default=10, help="Number of episodes to collect data")
+    parser.add_argument('--num_episodes', type=int, default=10,
+                        help="[历史参数] 旧版用训练迭代次数近似“轮数”；现在保存节奏由 --save_model_every_replays 控制")
     parser.add_argument('--target_update', type=int, default=10, help="Number of episodes to collect data")
     parser.add_argument('--observation_delay_sec', type=float, default=0.08,
                         help="Delay after each action bundle before taking the next observation")
@@ -417,7 +421,7 @@ def get_args():
                         help="Print phase controller diagnostics")
     parser.add_argument('--phase_low_hp_threshold', type=float, default=0.32,
                         help="Estimated HP ratio under which the phase controller retreats")
-    parser.add_argument('--phase_low_hp_confirm_steps', type=int, default=3,
+    parser.add_argument('--phase_low_hp_confirm_steps', type=int, default=5,
                         help="Consecutive low-HP visual frames required before phase retreat")
     parser.add_argument('--phase_self_hp_roi_left', type=float, default=0.30,
                         help="Left bound of the self-HP search ROI")
@@ -473,18 +477,10 @@ def get_args():
                         help="Interval for no-wave patrol moves when rookie patrol is enabled")
     parser.add_argument('--rookie_laner_hold_attack_interval_steps', type=int, default=3,
                         help="Interval for basic attacks while holding lane")
-    parser.add_argument('--finish_check_interval_steps', type=int, default=10,
+    parser.add_argument('--finish_check_interval_steps', type=int, default=30,
                         help="How often to run expensive OCR-based terminal checks")
-    parser.add_argument('--finish_check_start_step', type=int, default=30,
+    parser.add_argument('--finish_check_start_step', type=int, default=120,
                         help="Skip expensive OCR-based terminal checks before this episode step")
-    parser.add_argument('--match_exit_detect_enabled', type=str2bool, default=True,
-                        help="Treat a sustained loss of the in-match start signal as match end")
-    parser.add_argument('--match_exit_check_interval_steps', type=int, default=5,
-                        help="How often to check the in-match start signal after MATCH_READY")
-    parser.add_argument('--match_exit_confirm_steps', type=int, default=8,
-                        help="Consecutive missing start-signal checks required to end external mode")
-    parser.add_argument('--match_exit_min_step', type=int, default=30,
-                        help="Minimum episode step before start-signal absence can end the match")
     parser.add_argument('--death_check_interval_steps', type=int, default=5,
                         help="How often to run expensive death ONNX checks")
     parser.add_argument('--action_preview_enabled', type=str2bool, default=True,
@@ -493,6 +489,8 @@ def get_args():
                         help="Number of early episode steps for immediate action preview printing")
     parser.add_argument('--step_timing_debug', type=str2bool, default=True,
                         help="Record and print split timing diagnostics for action selection and env.step")
+    parser.add_argument('--step_info_log', type=str2bool, default=True,
+                        help="每步打印完整 info 字典(原版行为); false 时只打印一行紧凑摘要, 便于长时间盯日志")
     parser.add_argument('--traffic_probe_mode', type=str, default='adb_proc_net_dev',
                         choices=['disabled', 'adb_proc_net_dev'],
                         help="Traffic probe backend")
@@ -514,6 +512,10 @@ def get_args():
                         help="Reward weight for response latency quality")
     parser.add_argument('--step_metrics_path', type=str, default='src/step_metrics.jsonl',
                         help="JSONL file used to append per-step probe metrics")
+    parser.add_argument('--step_metrics_enabled', type=str2bool, default=True,
+                        help="是否写逐步指标 JSONL; 关掉可以省磁盘和一点 CPU")
+    parser.add_argument('--train_log_interval', type=int, default=20,
+                        help="每多少次训练迭代打印一次 loss/内存摘要")
     parser.add_argument('--behavior_prior_mode', type=str, default='smart',
                         choices=['smart', 'weighted', 'uniform'],
                         help="Exploration behavior prior used before the learned model becomes reliable")
@@ -579,6 +581,10 @@ def get_args():
                         help="Output model path for behavior cloning")
     parser.add_argument('--bc_num_workers', type=int, default=0,
                         help="DataLoader workers for behavior cloning; keep 0 on Windows unless needed")
+    parser.add_argument('--bc_include_ai_steps', type=str2bool, default=False,
+                        help="行为克隆时是否也学 AI 自己打的步; 默认只学人操作的步")
+    parser.add_argument('--bc_max_samples', type=int, default=0,
+                        help="行为克隆最多使用多少条样本; 0 表示不限")
     parser.add_argument('--relabel_episode_dir', type=str, default='',
                         help="Episode directory used by relabel_human_actions.py; empty means latest")
     parser.add_argument('--relabel_output_path', type=str, default='',
@@ -588,13 +594,265 @@ def get_args():
     parser.add_argument('--relabel_preview_limit', type=int, default=20,
                         help="Number of most common relabeled actions to print")
 
+    # ------------------------------------------------------------------ #
+    # 整场人为辅助训练（新增）
+    # ------------------------------------------------------------------ #
+    parser.add_argument('--assist_mode', type=str, default='off',
+                        choices=['off', 'assist', 'manual'],
+                        help="人为辅助模式: off=不用; assist=人随时可以伸手接管, 松手后自动还给 AI; "
+                             "manual=整局都由人打, AI 只观测不注入")
+    parser.add_argument('--assist_enabled', type=str2bool, default=None,
+                        help="兼容开关: true 等价于 --assist_mode assist, false 等价于 off")
+    parser.add_argument('--assist_partial', type=str2bool, default=False,
+                        help="只接管人真正碰到的分支(移动/信息/攻击), 未触碰的分支继续用 AI 输出")
+    parser.add_argument('--assist_auto_resume', type=str2bool, default=True,
+                        help="人松手并超过释放等待后, 是否自动把控制权还给 AI")
+    parser.add_argument('--assist_touch_window_ms', type=int, default=400,
+                        help="把多长时间的触摸样本折算成一步人为动作")
+    parser.add_argument('--assist_release_grace_steps', type=int, default=2,
+                        help="人松手后再保持多少步不注入操作, 避免人和 AI 抢摇杆")
+    parser.add_argument('--assist_resume_grace_steps', type=int, default=1,
+                        help="交还给 AI 前先空多少步, 让游戏状态稳定")
+    parser.add_argument('--assist_preempt_burst_duration_ms', type=int, default=0,
+                        help="人为辅助开启时压缩单步 burst 时长(毫秒), 0 表示不改, 用于降低接管延迟")
+    parser.add_argument('--assist_echo_guard', type=int, default=0,
+                        help="回声保护窗口(毫秒): 丢弃程序刚注入过的触摸; input 注入不会回灌 getevent, "
+                             "只有 persistent_minitouch 这类 uinput 方案才需要")
+    parser.add_argument('--assist_debug_touch', type=str2bool, default=False,
+                        help="把 getevent 的原始行打印出来, 用于排查人为动作解析不出来")
+    parser.add_argument('--assist_debug_touch_limit', type=int, default=40,
+                        help="最多打印多少行原始触摸数据")
+    parser.add_argument('--assist_record_enabled', type=str2bool, default=True,
+                        help="是否把每一步写入人为辅助数据集")
+    parser.add_argument('--assist_dataset_dir', type=str, default='human_data/live',
+                        help="人为辅助数据集根目录, 每局一个子目录")
+    parser.add_argument('--assist_episode_id', type=str, default='',
+                        help="人为辅助数据集的本局 id; 空表示用时间戳")
+    parser.add_argument('--assist_frame_policy', type=str, default='human',
+                        choices=['human', 'all', 'none'],
+                        help="关键帧保存策略: human=只存人为操作用到的帧; all=每步都存; none=不存图")
+    parser.add_argument('--assist_frame_max_width', type=int, default=640,
+                        help="保存关键帧时的最大宽度")
+    parser.add_argument('--assist_jpeg_quality', type=int, default=78,
+                        help="关键帧 JPEG 质量")
+    parser.add_argument('--assist_preroll_steps', type=int, default=4,
+                        help="人为接管前额外保留的上下文帧数")
+    parser.add_argument('--assist_human_sample_fraction', type=float, default=0.35,
+                        help="DQN 采样时人为示范经验占批次的最低比例")
+    parser.add_argument('--assist_human_sample_boost', type=float, default=1.0,
+                        help="人为示范样本配额放大系数, 相当于重复利用人为经验")
+    parser.add_argument('--assist_human_reward_bonus', type=float, default=0.0,
+                        help="人为接管这一步额外奖励; 0 表示不改奖励函数")
+    parser.add_argument('--assist_human_priority', type=float, default=1.0,
+                        help="写进经验的优先级标记, 供后续优先采样使用")
+
+    # ------------------------------------------------------------------ #
+    # 整场行为 profile（新增）
+    # ------------------------------------------------------------------ #
+    parser.add_argument('--game_profile_enabled', type=str2bool, default=True,
+                        help="是否加载整场行为 profile")
+    parser.add_argument('--game_profile_path', type=str, default='src/game_profile.json',
+                        help="build_game_profile.py 生成的整场行为 profile")
+    parser.add_argument('--game_profile_prior_mode', type=str, default='off',
+                        choices=['off', 'fill', 'force'],
+                        help="整场先验的用法: off=关; fill=只补空分支; force=按 profile 生成完整动作")
+    parser.add_argument('--game_profile_angle_jitter', type=int, default=6,
+                        help="整场先验走位角度的随机抖动")
+    parser.add_argument('--game_profile_min_steps', type=int, default=6,
+                        help="阶段样本少于该值时回退到阶段组/全局统计")
+
+    # ------------------------------------------------------------------ #
+    # 双端模式：设备在本地，训练在另一台机器
+    # ------------------------------------------------------------------ #
+    parser.add_argument('--device_source', type=str, default='local',
+                        choices=['local', 'remote'],
+                        help="local=完全本地(默认); remote=本机只当设备端(配合 device_agent.py 用 --device_endpoint)")
+    parser.add_argument('--device_endpoint', type=str, default='127.0.0.1:5599',
+                        help="remote 模式下 device_agent 的地址, 形如 192.168.1.5:5599")
+    parser.add_argument('--device_token', type=str, default='',
+                        help="双端之间的简单口令; 两端一致才接受连接, 空表示不校验")
+    parser.add_argument('--device_rpc_timeout_ms', type=int, default=3000,
+                        help="remote 模式下单次 RPC 超时; 超时会松摇杆并跳过这一步")
+    parser.add_argument('--device_reconnect_attempts', type=int, default=2,
+                        help="remote 模式下断线后重连次数")
+    parser.add_argument('--device_listen_host', type=str, default='0.0.0.0',
+                        help="device_agent 监听地址")
+    parser.add_argument('--device_listen_port', type=int, default=5599,
+                        help="device_agent 监听端口")
+    parser.add_argument('--device_frame_format', type=str, default='jpeg',
+                        choices=['jpeg', 'png', 'raw'],
+                        help="双端传输的帧格式; jpeg 最省带宽(约 300KB/帧), raw 无损但约 7.8MB/帧")
+    parser.add_argument('--device_frame_quality', type=int, default=82,
+                        help="jpeg 质量; 两端必须一致, 否则奖励里的画面差分会漂移")
+    parser.add_argument('--device_watchdog_sec', type=float, default=10.0,
+                        help="device_agent 多久收不到请求就自动松摇杆(防止程序端崩了角色一直跑)")
+    parser.add_argument('--device_getevent_enabled', type=str2bool, default=True,
+                        help="device_agent 是否把 adb getevent 的触摸行转发给程序端")
+    parser.add_argument('--device_show_scrcpy', type=str2bool, default=True,
+                        help="device_agent 启动时是否自己拉起 scrcpy 窗口（双端模式下截图靠它）")
+
+    # ------------------------------------------------------------------ #
+    # 网络结构与显存（新增）
+    # ------------------------------------------------------------------ #
+    parser.add_argument('--net_arch', type=str, default='legacy',
+                        choices=['auto', 'compact', 'legacy'],
+                        help="策略网络结构: legacy 与原项目同体量(1.99 亿参数 / 762MB / 640 输入, 默认); "
+                             "compact 小网络(110 万参数, 需配 --obs_size 160); auto 等同 compact")
+    parser.add_argument('--net_pool_size', type=int, default=4,
+                        help="compact 结构自适应池化的输出边长")
+    parser.add_argument('--obs_size', type=int, default=640,
+                        help="喂给策略网络的观测边长; legacy 固定 640, compact 可用 160 省显存")
+    parser.add_argument('--obs_resize_method', type=str, default='area',
+                        choices=['area', 'linear'],
+                        help="观测缩放插值方式")
+    parser.add_argument('--amp', type=str2bool, default=None,
+                        help="训练是否使用混合精度(fp16)。不指定时按结构自动决定: legacy 开启"
+                             "(实测 5313MB/823ms -> 5046MB/430ms), compact 关闭(实测更慢)")
+    parser.add_argument('--amp_inference', type=str2bool, default=None,
+                        help="推理是否使用混合精度; 不指定时跟随 --amp")
+    parser.add_argument('--grad_clip_norm', type=float, default=10.0,
+                        help="梯度裁剪阈值; 0 表示关闭")
+    parser.add_argument('--td_target_clip', type=float, default=50.0,
+                        help="TD 目标绝对值上限, 防止多动作头相加后的 Q 值自举发散; 0 表示不裁剪")
+    parser.add_argument('--pin_memory', type=str2bool, default=True,
+                        help="使用锁页内存加速主机到设备的批量拷贝")
+    parser.add_argument('--human_aux_bc_weight', type=float, default=0.5,
+                        help="在人为示范经验上追加的模仿损失权重; 0 表示只用 Q loss")
+    parser.add_argument('--vram_log_interval_steps', type=int, default=0,
+                        help="每多少步打印一次显存快照; 0 表示关闭")
+    parser.add_argument('--vram_empty_cache_interval_steps', type=int, default=200,
+                        help="每多少次训练迭代回收一次显存缓存; 0 表示不回收")
+    parser.add_argument('--cudnn_benchmark', type=str2bool, default=True,
+                        help="固定输入尺寸下启用 cuDNN benchmark, 让卷积选最快实现")
+    parser.add_argument('--model_out_path', type=str, default='src/wzry_ai.pt',
+                        help="训练产出的模型路径; 始终写在项目目录内")
+    parser.add_argument('--save_model_every_replays', type=int, default=200,
+                        help="每多少次训练迭代保存一次模型")
+    parser.add_argument('--asset_root', type=str, default='',
+                        help="额外的只读资源根目录(逗号分隔), 用于放置体积大的权重/模型")
+    parser.add_argument('--scrcpy_dir', type=str, default='scrcpy-win64-v2.0',
+                        help="scrcpy/adb 目录")
+
+    # ------------------------------------------------------------------ #
+    # 推理侧显存（新增）
+    # ------------------------------------------------------------------ #
+    parser.add_argument('--onnx_provider', type=str, default='auto',
+                        choices=['auto', 'cpu', 'cuda'],
+                        help="ONNX 检测模型(inpaint/start/death)运行后端")
+    parser.add_argument('--onnx_gpu_mem_limit_mb', type=int, default=512,
+                        help="单个 ONNX CUDA 会话的显存上限")
+    parser.add_argument('--onnx_intra_op_threads', type=int, default=2,
+                        help="ONNX Runtime 线程数")
+    parser.add_argument('--ocr_provider', type=str, default='auto',
+                        choices=['auto', 'cpu', 'cuda'],
+                        help="胜负 OCR 运行后端; cpu 可以把 OCR 的显存占用完全让出来")
+    parser.add_argument('--death_check_enabled', type=str2bool, default=True,
+                        help="是否加载/使用死亡检测 ONNX 模型")
+    parser.add_argument('--finish_check_enabled', type=str2bool, default=True,
+                        help="是否加载/使用胜负 OCR 模型")
+
+    # ------------------------------------------------------------------ #
+    # 对局结束判定与稳定性（新增，修「对局结束后仍在别的界面乱点」）
+    # ------------------------------------------------------------------ #
+    parser.add_argument('--episode_end_enabled', type=str2bool, default=True,
+                        help="除胜负 OCR 外, 再用「对局内健康度」判断一局是否已结束")
+    parser.add_argument('--episode_end_traffic_bytes', type=int, default=120000,
+                        help="最近若干步的网络流量中位数低于该值, 视为已离开对局")
+    parser.add_argument('--episode_end_confirm_steps', type=int, default=30,
+                        help="健康度判据需要连续确认多少步")
+    parser.add_argument('--episode_end_min_steps', type=int, default=120,
+                        help="开局多少步之后才允许用健康度判据结束")
+    parser.add_argument('--max_episode_steps', type=int, default=3600,
+                        help="单局步数硬上限, 0 表示不限; 防止无限空转")
+    parser.add_argument('--episode_end_drop_steps', type=int, default=30,
+                        help="判定结束前最后 N 步的经验不写入经验池(交界处的错帧)")
+    parser.add_argument('--probe_reward_scale', type=float, default=0.4,
+                        help="probe_reward(画面变化/交互)权重; 1.0 为原值, 0.4 可避免「动一动就有分」")
+    parser.add_argument('--attack_reward_hue_tolerance', type=int, default=14,
+                        help="攻击奖励里血条颜色 hue 容差, 越大越容易检测到攻击")
+    parser.add_argument('--event_debug_dump_dir', type=str, default='',
+                        help="把攻击/血量检测用到的 ROI 落盘(排查事件检测失效), 空表示不落盘")
+    parser.add_argument('--event_debug_every_steps', type=int, default=50,
+                        help="每隔多少步落一次 ROI 图")
+    parser.add_argument('--step_metrics_max_mb', type=float, default=32.0,
+                        help="step_metrics.jsonl 超过该体积时自动轮转; 0 表示不轮转")
+
     return parser.parse_args()
 
 
-# 解析参数并存储在全局变量中
-args = get_args()
+def _clamp_memory_size(parsed):
+    """按 `--memory_ram_limit_gb` 限制经验池规模。
 
-device = torch.device(args.device_id if torch.cuda.is_available() else 'cpu')
+    `legacy` 结构要求 640×640 观测，一条经验（state + next_state）约 2.4MB；
+    `--memory_size 10000` 会让常驻内存到 24GB 级别，所以这里按上限自动下调。
+    """
+    obs_size = int(parsed.obs_size)
+    per_entry = obs_size * obs_size * 3 * 2          # uint8, state + next_state
+    limit_gb = float(getattr(parsed, 'memory_ram_limit_gb', 0) or 0)
+    parsed.memory_bytes_per_entry = per_entry
+
+    if limit_gb <= 0:
+        parsed.memory_estimate_gb = round(per_entry * int(parsed.memory_size) / 1024 ** 3, 2)
+        return parsed
+
+    budget = int(limit_gb * 1024 ** 3)
+    max_entries = max(200, budget // max(1, per_entry))
+    if int(parsed.memory_size) > max_entries:
+        print("")
+        print(f"[memory] obs={obs_size} 时每条经验约 {per_entry / 1024 ** 2:.2f}MB，"
+              f"经验池 {parsed.memory_size} 条需要约 "
+              f"{per_entry * int(parsed.memory_size) / 1024 ** 3:.1f}GB 内存。")
+        print(f"[memory] 按 --memory_ram_limit_gb {limit_gb:g} 自动下调到 {max_entries} 条"
+              f"（约 {limit_gb:.1f}GB）。想保留更大经验池请调大该上限。")
+        print("")
+        parsed.memory_size = max_entries
+
+    parsed.memory_estimate_gb = round(per_entry * int(parsed.memory_size) / 1024 ** 3, 2)
+    return parsed
+
+
+def _finalize_paths(parsed):
+    """解析只读资源路径, 并支持用 --asset_root 指定额外的权重目录。"""
+    extra_roots = [item.strip() for item in str(getattr(parsed, 'asset_root', '') or '').split(',') if item.strip()]
+    asset_paths.set_asset_roots(extra_roots)
+
+    parsed.model_path = asset_paths.resolve_asset_path(parsed.model_path)
+    parsed.game_profile_path = asset_paths.resolve_asset_path(parsed.game_profile_path)
+    parsed.lane_profile_path = asset_paths.resolve_asset_path(parsed.lane_profile_path)
+    parsed.scrcpy_dir = asset_paths.resolve_asset_path(parsed.scrcpy_dir)
+
+    if parsed.assist_enabled is not None:
+        parsed.assist_mode = 'assist' if parsed.assist_enabled else 'off'
+
+    # legacy 结构的 fc 层维度写死为 640 输入，先把 obs_size 对齐，后续内存估算才准确
+    if str(getattr(parsed, 'net_arch', 'legacy')).lower() == 'legacy' and int(parsed.obs_size) != 640:
+        print(f"[net] legacy 结构要求 640x640 输入，已把 obs_size 从 {parsed.obs_size} 调整为 640")
+        parsed.obs_size = 640
+
+    # AMP 自动策略：大网络开（实测省 266MB 且快 1.9 倍），小网络关（实测更慢）
+    if parsed.amp is None:
+        parsed.amp = str(getattr(parsed, 'net_arch', 'legacy')).lower() == 'legacy'
+        print(f"[net] 未指定 --amp，按结构自动设为 {parsed.amp}")
+    if parsed.amp_inference is None:
+        parsed.amp_inference = bool(parsed.amp)
+
+    parsed = _clamp_memory_size(parsed)
+
+    # 输出路径一律固定在项目目录内
+    parsed.model_out_path = asset_paths.local_path(parsed.model_out_path)
+    parsed.assist_dataset_dir = asset_paths.local_path(parsed.assist_dataset_dir)
+    parsed.human_data_dir = asset_paths.local_path(parsed.human_data_dir)
+    return parsed
+
+
+# 解析参数并存储在全局变量中
+args = _finalize_paths(get_args())
+
+# 没有 torch 时（设备端）`device` 为 None；只有 dqnAgent 会用到它
+if torch is not None:
+    device = torch.device(args.device_id if torch.cuda.is_available() else 'cpu')
+else:
+    device = None
 
 # 全局状态
 globalInfo = GlobalInfo(batch_size=args.batch_size, buffer_capacity=args.memory_size)

@@ -1,4 +1,3 @@
-import datetime
 import json
 import os
 import threading
@@ -51,69 +50,63 @@ class GlobalInfo:
 
     # -------------------------------ppo经验池-------------------------------------
     def store_transition_ppo(self, *args):
-        self.lock.acquire()
-        try:
+        with self.lock:
             self.ppo_memory.push(*args)
-        finally:
-            self.lock.release()
 
     def is_memory_bigger_batch_size_ppo(self):
-        self.lock.acquire()
-        try:
-            if len(self.ppo_memory) < self.batch_size:
-                return False
-            else:
-                return True
-        finally:
-            self.lock.release()
+        with self.lock:
+            return len(self.ppo_memory) >= self.batch_size
 
     def random_batch_size_memory_ppo(self):
-        self.lock.acquire()
-        try:
-            transitions = self.ppo_memory.sample(self.batch_size)
-            return transitions
-        finally:
-            self.lock.release()
+        with self.lock:
+            return self.ppo_memory.sample(self.batch_size)
 
     # -------------------------------td3经验池-------------------------------------
     def store_transition_td3(self, *args):
-        self.td3_memory.push(*args)
+        with self.lock:
+            self.td3_memory.push(*args)
 
     def is_memory_bigger_batch_size_td3(self):
-        if len(self.td3_memory) < self.batch_size:
-            return False
-        else:
-            return True
+        with self.lock:
+            return len(self.td3_memory) >= self.batch_size
 
     def random_batch_size_memory_td3(self):
-        transitions = self.td3_memory.sample(self.batch_size)
-        return transitions
+        with self.lock:
+            return self.td3_memory.sample(self.batch_size)
 
     # -------------------------------dqn经验池-------------------------------------
     def store_transition_dqn(self, *args):
-        self.lock.acquire()
-        try:
+        """保存一条 DQN 经验。
+
+        兼容两种调用：
+        `(state, action, reward, next_state, done)` 和
+        `(state, action, reward, next_state, done, human_action, priority)`。
+        """
+        with self.lock:
             self.dqn_memory.push(*args)
-        finally:
-            self.lock.release()
 
     def is_memory_bigger_batch_size_dqn(self):
-        self.lock.acquire()
-        try:
-            if len(self.dqn_memory) < self.batch_size:
-                return False
-            else:
-                return True
-        finally:
-            self.lock.release()
+        with self.lock:
+            return len(self.dqn_memory) >= self.batch_size
 
-    def random_batch_size_memory_dqn(self):
-        self.lock.acquire()
-        try:
-            transitions = self.dqn_memory.sample(self.batch_size)
-            return transitions
-        finally:
-            self.lock.release()
+    def random_batch_size_memory_dqn(self, human_fraction=0.0, human_boost=1.0):
+        """采样一个训练批次。
+
+        `human_fraction > 0` 时，人为示范样本会占固定配额，
+        避免人工接管产生的少量高质量经验被随机探索冲淡。
+        """
+        with self.lock:
+            if human_fraction and human_fraction > 0:
+                return self.dqn_memory.sample_mixed(
+                    self.batch_size,
+                    human_fraction=human_fraction,
+                    human_boost=human_boost,
+                )
+            return self.dqn_memory.sample(self.batch_size)
+
+    def dqn_memory_stats(self):
+        with self.lock:
+            return self.dqn_memory.stats()
 
     # -------------------------------训练状态-------------------------------------
     def update_data_file(self, new_data):

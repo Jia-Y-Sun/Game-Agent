@@ -38,6 +38,33 @@ class NullTrafficProbe:
         }
 
 
+def parse_proc_net_dev(text):
+    """把 `/proc/net/dev` 的原始文本解析成 {接口: 计数} 字典。
+
+    抽成独立函数，是为了让设备端只转发原始文本、程序端用同一套解析（双端模式）。
+    """
+    counters = {}
+    for line in (text or "").splitlines():
+        if ":" not in line:
+            continue
+        interface_name, raw_values = line.split(":", 1)
+        values = raw_values.split()
+        if len(values) < 10:
+            continue
+
+        interface_name = interface_name.strip()
+        if interface_name == "lo":
+            continue
+
+        counters[interface_name] = {
+            "rx_bytes": int(values[0]),
+            "rx_packets": int(values[1]),
+            "tx_bytes": int(values[8]),
+            "tx_packets": int(values[9]),
+        }
+    return counters
+
+
 class AdbProcNetDevTrafficProbe:
     def __init__(self, adb_path, device_serial, interfaces=None, timeout_sec=1.0):
         self.adb_path = adb_path
@@ -48,7 +75,7 @@ class AdbProcNetDevTrafficProbe:
     def reset_episode(self):
         return None
 
-    def _read_proc_net_dev(self):
+    def _read_proc_net_dev_text(self):
         result = subprocess.run(
             [self.adb_path, "-s", self.device_serial, "shell", "cat", "/proc/net/dev"],
             capture_output=True,
@@ -56,28 +83,11 @@ class AdbProcNetDevTrafficProbe:
             timeout=self.timeout_sec,
         )
         if result.returncode != 0:
-            return {}
+            return ""
+        return result.stdout
 
-        counters = {}
-        for line in result.stdout.splitlines():
-            if ":" not in line:
-                continue
-            interface_name, raw_values = line.split(":", 1)
-            values = raw_values.split()
-            if len(values) < 10:
-                continue
-
-            interface_name = interface_name.strip()
-            if interface_name == "lo":
-                continue
-
-            counters[interface_name] = {
-                "rx_bytes": int(values[0]),
-                "rx_packets": int(values[1]),
-                "tx_bytes": int(values[8]),
-                "tx_packets": int(values[9]),
-            }
-        return counters
+    def _read_proc_net_dev(self):
+        return parse_proc_net_dev(self._read_proc_net_dev_text())
 
     def _select_interfaces(self, counters):
         if self.interfaces:
@@ -149,8 +159,18 @@ def build_traffic_probe(android_controller):
         return NullTrafficProbe()
 
     interfaces = [item.strip() for item in args.traffic_probe_interfaces.split(",") if item.strip()]
+
+    # 双端模式：adb 在设备那台机器上，流量也由设备端读 /proc/net/dev 再转发过来
+    if getattr(android_controller, "is_remote_device", False):
+        from remote_device import RemoteProcNetDevTrafficProbe
+        return RemoteProcNetDevTrafficProbe(
+            android_controller,
+            interfaces=interfaces,
+            timeout_sec=args.traffic_probe_timeout_sec,
+        )
+
     return AdbProcNetDevTrafficProbe(
-        adb_path=android_controller.adb_path,
+        adb_path=f"{android_controller.scrcpy_dir}/adb",
         device_serial=android_controller.device_serial,
         interfaces=interfaces,
         timeout_sec=args.traffic_probe_timeout_sec,

@@ -170,9 +170,44 @@ class GamePhaseController:
 
     def __init__(self):
         self.observer = VisualStateObserver()
+        self.profile_prior = None
         self.reset_episode()
 
+    def attach_profile_prior(self, prior):
+        """挂载整场行为 profile 先验（`game_profile.GameProfilePrior`）。
+
+        `wzry` 原版只有开局能用人为 profile 调整行为；挂上之后，
+        每个阶段都能按人的节奏回放（由 `--game_profile_prior_mode` 控制强度）。
+        """
+        self.profile_prior = prior
+        if prior is not None:
+            print(f"[phase] 已挂载整场行为先验: {prior.describe()}")
+
+    def _apply_profile_prior(self, action, phase, visual_state):
+        mode = str(getattr(args, "game_profile_prior_mode", "off") or "off").lower()
+        prior = self.profile_prior
+        if mode == "off" or prior is None or not getattr(prior, "available", False):
+            return action
+
+        try:
+            sampled = prior.sample(
+                phase,
+                step=getattr(prior, "step_index", 0),
+                jitter=int(getattr(args, "game_profile_angle_jitter", 0) or 0),
+                only_fill=(mode == "fill"),
+                base_action=action,
+            )
+        except (TypeError, ValueError, KeyError, ZeroDivisionError) as exc:
+            print(f"[phase] 整场先验生成失败({exc})，本步回退到规则动作")
+            return action
+        if sampled is None:
+            return action
+        return [int(value) for value in sampled]
+
     def reset_episode(self):
+        self.profile_prior = getattr(self, "profile_prior", None)
+        if self.profile_prior is not None:
+            self.profile_prior.reset_episode()
         self.step_index = 0
         self.phase = "opening"
         self.retreat_steps_left = 0
@@ -186,6 +221,10 @@ class GamePhaseController:
         self.last_event = event_name
         if event_name == "death":
             self.recover_steps_left = max(self.recover_steps_left, args.phase_recover_steps)
+
+    def default_info(self):
+        """不推进步数的默认 info，供人为接管期间冻结控制器时使用。"""
+        return self._info(False, self.phase, "idle", {}, reason="human_assist_hold")
 
     def refine_action(self, action, image, target_info, lane_info, minimap_state=None):
         if not args.phase_controller_enabled:
@@ -237,6 +276,13 @@ class GamePhaseController:
             action_name = "push_tower"
         else:
             refined, override, action_name = self._laning_action(action, visual_state, lane_info)
+
+        # 整场行为先验：把人为示范统计出的阶段节奏补进来
+        before_prior = list(refined)
+        refined = self._apply_profile_prior(refined, phase, visual_state)
+        if list(refined) != before_prior and not override:
+            override = True
+            action_name = action_name + "+profile_prior"
 
         if args.phase_debug:
             print("phase", phase, action_name, reason, visual_state)

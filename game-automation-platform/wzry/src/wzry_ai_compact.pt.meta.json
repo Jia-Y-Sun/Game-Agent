@@ -1,0 +1,9 @@
+{
+  "arch": "compact",
+  "obs_size": 160,
+  "steps_done": 28800,
+  "epsilon": 0.01,
+  "reward_scale": 0.1,
+  "td_target_clip": 50.0,
+  "params": 1099922
+}

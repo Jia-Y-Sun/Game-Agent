@@ -10,6 +10,9 @@ def parse_args():
     parser.add_argument("--burst_ms", type=int, default=700)
     parser.add_argument("--sleep_ms", type=int, default=80)
     local_args, remaining_args = parser.parse_known_args()
+    # 兼容 `-- --iphone_id ...` 的写法：argparse 会把 `--` 留在剩余参数里，
+    # 而 argparses.py 用的是 parse_args()，看到前导 `--` 会把后面的选项当成位置参数报错。
+    remaining_args = [item for item in remaining_args if item != "--"]
     sys.argv = [sys.argv[0], *remaining_args]
     return local_args
 

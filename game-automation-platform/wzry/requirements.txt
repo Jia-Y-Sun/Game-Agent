@@ -1,10 +1,35 @@
-opencv-contrib-python==4.9.0.80
-numpy==1.26.4
-onnxruntime==1.23.2
-torch==2.5.1
+# ======================================================================
+# 依赖分三组，按你要跑的「角色」装即可
+#
+#   ① 设备端（有模拟器那台）：numpy / opencv / PyQt5 / pywin32 / filelock
+#      —— 不需要 torch、onnxruntime、ppocr（这些只在程序端用）
+#   ② 程序端（有显卡那台）：① 之外再加 onnxruntime / ppocr-onnx / torch
+#   ③ 完全本地模式：等于 ① + ②，也就是下面全部
+#
+# 装法：
+#   pip install -r requirements.txt              # 完全本地
+#   pip install numpy opencv-contrib-python PyQt5 pywin32 filelock   # 仅设备端
+# ======================================================================
+
+# ---- ① 设备端 + 程序端都需要 ----
+numpy>=1.24
+opencv-contrib-python>=4.8
 PyQt5==5.15.10
-pywin32==306
-keyboard==0.13.5
-ppocr-onnx==0.0.3.9
-matplotlib==3.9.2
-filelock==3.13.1
+pywin32>=306
+filelock>=3.12
+
+# ---- ② 只在程序端需要 ----
+# 推理后端：GPU 用户把下面这行换成 onnxruntime-gpu
+onnxruntime>=1.16
+
+# 胜负 OCR
+ppocr-onnx>=0.0.3.9
+
+# 深度学习框架
+# GPU 用户建议按 CUDA 版本单独安装，例如：
+#   pip install torch --index-url https://download.pytorch.org/whl/cu118
+torch>=2.0
+
+# ---- 可选 ----
+# persistent_minitouch 摇杆后端
+# pyminitouch==0.3.3

@@ -1,5 +1,7 @@
 from collections import deque
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
 
 import cv2
 import numpy as np
@@ -10,12 +12,35 @@ from globalInfo import GlobalInfo
 from onnxRunner import OnnxRunner
 
 
+def _ocr_providers():
+    """胜负 OCR 的运行后端，可以把 OCR 的显存占用整体让出来。"""
+    requested = str(getattr(args, "ocr_provider", "auto") or "auto").lower()
+    try:
+        import onnxruntime as ort
+        available = set(ort.get_available_providers())
+    except Exception:
+        available = {"CPUExecutionProvider"}
+
+    if requested == "cpu":
+        return ["CPUExecutionProvider"]
+    if requested == "cuda":
+        return ["CUDAExecutionProvider", "CPUExecutionProvider"] if "CUDAExecutionProvider" in available else [
+            "CPUExecutionProvider"
+        ]
+    return ["CUDAExecutionProvider", "CPUExecutionProvider"] if "CUDAExecutionProvider" in available else [
+        "CPUExecutionProvider"
+    ]
+
+
 class GetRewordUtil:
     def __init__(self):
         self.device = device
         self.globalInfo = GlobalInfo()
-        self.death_check = OnnxRunner('models/death.onnx', classes=['death'])
-        self.text_sys = TextSystem()
+        # 【显存优化】延迟创建：只有真正用到死亡检测/胜负 OCR 时才加载模型。
+        # 原版在 `train.py` 启动阶段就同时建了两个 117MB 检测模型 + PPOCR 会话，
+        # 光是启动就吃掉几百 MB 显存。
+        self.death_check = None
+        self.text_sys = None
         self.executor = ThreadPoolExecutor(max_workers=3)
 
         self.frame_change_target = 0.08
@@ -30,10 +55,51 @@ class GetRewordUtil:
 
         self.reset_episode()
 
+    # ------------------------------------------------------------------ #
+    # 模型懒加载
+    # ------------------------------------------------------------------ #
+    def _ensure_death_check(self):
+        if not getattr(args, "death_check_enabled", True):
+            return None
+        if self.death_check is None:
+            try:
+                self.death_check = OnnxRunner('models/death.onnx', classes=['death'])
+            except Exception as exc:
+                print(f"[reward] 死亡检测模型加载失败，后续跳过该项: {exc}")
+                return None
+        return self.death_check
+
+    def _ensure_text_system(self):
+        if not getattr(args, "finish_check_enabled", True):
+            return None
+        if self.text_sys is None:
+            providers = _ocr_providers()
+            try:
+                self.text_sys = TextSystem(ort_providers=providers)
+            except TypeError:
+                self.text_sys = TextSystem()
+            except Exception as exc:
+                print(f"[reward] 胜负 OCR 加载失败，后续跳过该项: {exc}")
+                return None
+            print(f"[reward] 胜负 OCR providers={providers}")
+        return self.text_sys
+
+    def release_models(self):
+        """释放推理模型，把显存让给训练。"""
+        if self.death_check is not None:
+            try:
+                self.death_check.release()
+            except AttributeError:
+                pass
+            self.death_check = None
+        self.text_sys = None
+
     def reset_episode(self):
         self.recent_action_signatures = deque(maxlen=64)
         self.last_move_angle = None
         self.step_index = 0
+        #: 事件检测健康度（攻击/死亡是否真的被检测到），用于发现「检测失效」而不是静默为 0
+        self.event_stats = Counter()
 
     def predict_attack_delta(self, previous_image, image):
         if previous_image is None or previous_image.size == 0:
@@ -41,11 +107,43 @@ class GetRewordUtil:
 
         previous_attack_visible, previous_reward_count = self.calculate_attack_reword(previous_image)
         current_attack_visible, current_reward_count = self.calculate_attack_reword(image)
-        if not previous_attack_visible or not current_attack_visible:
+        self.event_stats["attack_checks"] += 1
+        if not current_attack_visible:
+            return False, 0
+        if not previous_attack_visible:
+            # 只有当前帧能看到血条时，把「血条首次出现」当作可能的接敌，不下判定
             return False, 0
 
         reward_delta = max(0, current_reward_count - previous_reward_count)
+        if reward_delta > 0:
+            self.event_stats["attack_hits"] += 1
         return reward_delta > 0, reward_delta
+
+    def _dump_event_roi(self, image, tag):
+        """把事件检测用到的 ROI 落盘，便于确认「0 次攻击事件」到底是没打到还是 ROI 不对。"""
+        directory = getattr(args, "event_debug_dump_dir", "") or ""
+        if not directory or not image.size:
+            return
+        every = max(1, int(getattr(args, "event_debug_every_steps", 50) or 50))
+        if self.step_index % every != 0:
+            return
+        try:
+            os.makedirs(directory, exist_ok=True)
+            height, width = image.shape[:2]
+            left = int(width * 0.57)
+            top = int(height * 0.019)
+            right = int(left + width * 0.116)
+            bottom = int(top + height * 0.024)
+            roi = image[top:bottom, left:right]
+            if roi.size:
+                cv2.imwrite(os.path.join(directory, f"{tag}_attack_roi_{self.step_index:06d}.png"), roi)
+            hp_left, hp_right = int(width * args.phase_self_hp_roi_left), int(width * args.phase_self_hp_roi_right)
+            hp_top, hp_bottom = int(height * args.phase_self_hp_roi_top), int(height * args.phase_self_hp_roi_bottom)
+            hp_roi = image[hp_top:hp_bottom, hp_left:hp_right]
+            if hp_roi.size:
+                cv2.imwrite(os.path.join(directory, f"{tag}_hp_roi_{self.step_index:06d}.png"), hp_roi)
+        except (OSError, ValueError, cv2.error):
+            pass
 
     def calculate_attack_reword(self, img):
         image_height, image_width = img.shape[:2]
@@ -64,9 +162,9 @@ class GetRewordUtil:
         hsv_color = cv2.cvtColor(bgr_color, cv2.COLOR_BGR2HSV)
         hue = hsv_color[0][0][0]
 
-        tolerance = 10
-        lower_bound = np.array([hue - tolerance, 50, 50])
-        upper_bound = np.array([hue + tolerance, 255, 255])
+        tolerance = int(getattr(args, "attack_reward_hue_tolerance", 10) or 10)
+        lower_bound = np.array([max(0, hue - tolerance), 50, 50])
+        upper_bound = np.array([min(179, hue + tolerance), 255, 255])
         mask = cv2.inRange(hsv_image, lower_bound, upper_bound)
         color_segment = cv2.bitwise_and(cropped_img, cropped_img, mask=mask)
         gray = cv2.cvtColor(color_segment, cv2.COLOR_BGR2GRAY)
@@ -328,7 +426,10 @@ class GetRewordUtil:
         return 0.0
 
     def check_finish(self, image):
-        res = self.text_sys.detect_and_ocr(image)
+        text_sys = self._ensure_text_system()
+        if text_sys is None:
+            return 0, None
+        res = text_sys.detect_and_ocr(image)
         done = 0
         class_name = None
         for boxed_result in res:
@@ -342,37 +443,11 @@ class GetRewordUtil:
                 break
         return done, class_name
 
-    def classify_match_result(self, image):
-        try:
-            results = self.text_sys.detect_and_ocr(image)
-        except Exception:
-            return "unknown", "ocr_error"
-
-        texts = [
-            str(getattr(item, "ocr_text", "")).strip()
-            for item in results
-            if str(getattr(item, "ocr_text", "")).strip()
-        ]
-        joined = " ".join(texts).upper()
-
-        result_keywords = (
-            ("win", ("胜利", "VICTORY", "完胜", "胜利者")),
-            ("loss", ("失败", "DEFEAT", "惜败", "败方")),
-            ("draw", ("平局", "DRAW")),
-        )
-        for result, keywords in result_keywords:
-            for keyword in keywords:
-                if keyword.upper() in joined:
-                    return result, "settlement_ocr"
-
-        practice_keywords = ("分路表现", "团队贡献", "点击此处继续")
-        if any(keyword in joined for keyword in practice_keywords):
-            return "practice", "training_settlement"
-
-        return "unknown", "no_result_keywords"
-
     def check_death(self, image):
-        check_game_death = self.death_check.get_max_label(image)
+        death_check = self._ensure_death_check()
+        if death_check is None:
+            return None
+        check_game_death = death_check.get_max_label(image)
         if check_game_death == 'death':
             return check_game_death
         return None
@@ -426,6 +501,12 @@ class GetRewordUtil:
                 class_name = md_class_name
 
         probe_reward, diagnostics = self.calculate_probe_reward(previous_image, image, action)
+        # 【P5】probe 只看「画面有没有变化」，不区分「在打人」和「在乱走」，
+        # 原权重下单局能占到 60%+ 的奖励总量；这里整体降权。
+        probe_scale = float(getattr(args, "probe_reward_scale", 1.0) or 1.0)
+        if probe_scale >= 0 and probe_scale != 1.0:
+            probe_reward = probe_reward * probe_scale
+            diagnostics["probe_reward_scaled"] = round(probe_scale, 3)
         gameplay_reward, gameplay_diagnostics = self.calculate_gameplay_reward(action, diagnostics)
         traffic_reward, traffic_diagnostics = self.calculate_traffic_reward(
             traffic_metrics,
@@ -436,6 +517,7 @@ class GetRewordUtil:
         phase_reward, phase_diagnostics = self.calculate_phase_reward(action, phase_info)
         event_reward = self.calculate_event_reward(class_name, attack_reward_count, action)
         total_reward = probe_reward + gameplay_reward + traffic_reward + target_reward + phase_reward + event_reward
+        self._dump_event_roi(image, "step")
         info = {
             "event": class_name,
             "probe_reward": round(probe_reward, 4),
@@ -444,6 +526,7 @@ class GetRewordUtil:
             "target_reward": round(target_reward, 4),
             "phase_reward": round(phase_reward, 4),
             "event_reward": round(event_reward, 4),
+            "event_stats": dict(self.event_stats),
             **diagnostics,
             **gameplay_diagnostics,
             **traffic_diagnostics,
