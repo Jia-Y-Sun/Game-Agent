@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "source_samples_path": "E:\\srtp\\boce\\wzry_ai-main\\human_data\\lane_hold_demo\\samples.jsonl",
+  "profile_step_sec": 0.5,
+  "record_count": 59,
+  "opening_move_only_profile": true,
+  "opening_touch_route": true,
+  "move_joystick_center": {
+    "x": 0.173,
+    "y": 0.784
+  },
+  "touch_inferred_move_count": 52,
+  "opening_move_ratio": 0.8814,
+  "route_angles": [
+    7
+  ],
+  "route_steps": [
+    52
+  ],
+  "patrol_angles": [
+    275,
+    8,
+    175,
+    190
+  ],
+  "removed_route_segments": [],
+  "info_schedule": [],
+  "attack_schedule": [],
+  "opening_attack_start_step": 52,
+  "opening_skill_start_step": 52,
+  "skill_interval_steps": 7,
+  "last_hit_interval_steps": 4,
+  "push_tower_interval_steps": 13,
+  "summary": {
+    "move": {
+      "0": 7,
+      "1": 52
+    },
+    "info": {
+      "0": 59
+    },
+    "attack": {
+      "0": 59
+    }
+  },
+  "source_record_count": 291
+}

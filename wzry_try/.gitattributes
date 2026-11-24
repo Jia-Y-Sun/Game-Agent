@@ -1,0 +1,24 @@
+# 统一换行符，避免 Windows/Linux 混合提交产生整文件 diff
+* text=auto eol=lf
+
+# 源码与文档
+*.py   text
+*.md   text
+*.txt  text
+*.json text
+*.yml  text
+*.yaml text
+
+# Windows 脚本保持 CRLF
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# 二进制（不要做文本转换与 diff）
+*.onnx binary
+*.pt   binary
+*.pth  binary
+*.exe  binary
+*.dll  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary

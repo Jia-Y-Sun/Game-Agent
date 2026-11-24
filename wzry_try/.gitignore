@@ -1,0 +1,48 @@
+# ------------------------------ Python ------------------------------
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ---------------------------- 训练产物 ------------------------------
+# 模型权重（体积大，且每个人训练结果不同）
+*.pt
+*.pth
+*.onnx
+src/step_metrics*.jsonl
+
+# 逐步指标与示范数据
+*.jsonl
+src/event_roi/
+src/game_profile.json
+human_data/
+
+# 运行日志
+*.log
+logs/
+
+# 临时目录
+.selftest_tmp/
+
+# --------------------------- 第三方/大文件 ---------------------------
+# scrcpy + adb（请自行下载解压到该目录）
+scrcpy-win64-v2.0/
+models/
+
+# ------------------------------ 编辑器 ------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ------------------------------ 其它 --------------------------------
+# showposition.py 抓的临时截图
+images/screen.png
+# 历史遗留的占位目录
+status/

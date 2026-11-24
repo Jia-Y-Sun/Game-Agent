@@ -27,3 +27,8 @@ game-automation-platform/wzry/release_packages/
 game-automation-platform/minipilot-main/.venv/
 game-automation-platform/minipilot-main/runs/
 game-automation-platform/minipilot-main/mini_pilot.config.json
+
+# --- wzry_try 独立项目(王者最新训练框架) ---
+wzry_try/scrcpy-win64-v2.0/
+wzry_try/models/
+wzry_try/human_data/
